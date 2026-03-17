@@ -1,4 +1,4 @@
-# Ciel Pet — Terminal Prototype
+# ClawTachie — Terminal Prototype
 
 ## Goal
 
@@ -38,7 +38,7 @@ The client is an "operator" role client that uses the Gateway's `chat.send` / `c
        "minProtocol": 3,
        "maxProtocol": 3,
        "client": {
-         "id": "ciel-pet",
+         "id": "clawtachie",
          "version": "0.1.0",
          "platform": "linux",
          "mode": "operator"
@@ -64,7 +64,7 @@ The client is an "operator" role client that uses the Gateway's `chat.send` / `c
 
 ### Device Identity
 
-Generate an Ed25519 keypair on first run, persist to `~/.ciel-pet/device.json`.
+Generate an Ed25519 keypair on first run, persist to `~/.clawtachie/device.json`.
 
 The device ID is derived from the public key fingerprint (SHA-256 of the raw public key, base64url encoded).
 
@@ -87,7 +87,7 @@ Method: `chat.send`
   "id": "<uuid>",
   "method": "chat.send",
   "params": {
-    "sessionKey": "agent:main:ciel-pet",
+    "sessionKey": "agent:main:clawtachie",
     "message": "Hello from desktop pet!",
     "idempotencyKey": "<uuid>"
   }
@@ -103,7 +103,7 @@ The server broadcasts `chat` events:
   "event": "chat",
   "payload": {
     "runId": "<uuid>",
-    "sessionKey": "agent:main:ciel-pet",
+    "sessionKey": "agent:main:clawtachie",
     "seq": 1,
     "state": "delta",
     "message": { "role": "assistant", "content": "partial text..." }
@@ -122,7 +122,7 @@ Method: `chat.history`
   "id": "<uuid>",
   "method": "chat.history",
   "params": {
-    "sessionKey": "agent:main:ciel-pet",
+    "sessionKey": "agent:main:clawtachie",
     "limit": 20
   }
 }
@@ -161,12 +161,12 @@ Parse these out and display them separately:
 Read from environment variables:
 - `OPENCLAW_GATEWAY_URL` — WebSocket URL (default: `ws://127.0.0.1:18789`)
 - `OPENCLAW_GATEWAY_TOKEN` — Auth token (required)
-- `CIEL_PET_SESSION` — Session key (default: `agent:main:ciel-pet`)
+- `CIEL_PET_SESSION` — Session key (default: `agent:main:clawtachie`)
 
 ## File Structure
 
 ```
-ciel-pet/
+clawtachie/
 ├── package.json
 ├── tsconfig.json
 ├── src/

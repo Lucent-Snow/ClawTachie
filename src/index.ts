@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Ciel Pet — Terminal prototype
+// ClawTachie — Terminal prototype
 
 import readline from "node:readline";
 import { GatewayClient } from "./gateway-client.js";
@@ -7,14 +7,14 @@ import { ChatManager } from "./chat.js";
 
 const GATEWAY_URL = process.env["OPENCLAW_GATEWAY_URL"] ?? "ws://127.0.0.1:18789";
 const GATEWAY_TOKEN = process.env["OPENCLAW_GATEWAY_TOKEN"];
-const SESSION_KEY = process.env["CIEL_PET_SESSION"] ?? "agent:main:ciel-pet";
+const SESSION_KEY = process.env["CIEL_PET_SESSION"] ?? "agent:main:clawtachie";
 
 if (!GATEWAY_TOKEN) {
   console.error("Error: OPENCLAW_GATEWAY_TOKEN is required");
   process.exit(1);
 }
 
-console.log(`🐾 Ciel Pet Terminal v0.1.0`);
+console.log(`🐾 ClawTachie Terminal v0.1.0`);
 console.log(`   Gateway: ${GATEWAY_URL}`);
 console.log(`   Session: ${SESSION_KEY}`);
 console.log(`   Connecting...`);
