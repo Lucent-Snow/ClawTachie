@@ -110,10 +110,8 @@ export class GatewayClient {
     } else if (evt.event === "chat") {
       this.opts.onChatEvent?.(evt.payload ?? {});
     } else if (evt.event === "agent") {
-      // Backend clients receive "agent" stream events instead of "chat"
       this.opts.onChatEvent?.(evt.payload ?? {});
     } else if (evt.event === "agent.run.completed" || evt.event === "agent.run.error") {
-      // Signal end of agent run
       this.opts.onAgentRunEnd?.();
     }
     // Ignore other events (health, tick, etc.)

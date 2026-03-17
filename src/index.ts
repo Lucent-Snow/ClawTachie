@@ -20,43 +20,28 @@ console.log(`   Session: ${SESSION_KEY}`);
 console.log(`   Connecting...`);
 
 let responding = false;
-let streamEndTimer: ReturnType<typeof setTimeout> | null = null;
-
-function clearPrompt() {
-  // Move to start of line, clear it
-  process.stdout.write("\r\x1b[K");
-}
-
-function finishResponse() {
-  if (streamEndTimer) { clearTimeout(streamEndTimer); streamEndTimer = null; }
-  if (responding) {
-    chat.finishCurrentRun();
-  }
-}
-
-function resetStreamEndTimer() {
-  if (streamEndTimer) clearTimeout(streamEndTimer);
-  streamEndTimer = setTimeout(finishResponse, 2000);
-}
 
 const client = new GatewayClient({
   url: GATEWAY_URL,
   token: GATEWAY_TOKEN,
   sessionKey: SESSION_KEY,
   onChatEvent: (payload) => chat.handleChatEvent(payload),
-  onAgentRunEnd: () => finishResponse(),
+  onAgentRunEnd: () => {
+    if (responding) {
+      chat.finishCurrentRun();
+    }
+  },
   onConnected: (hello) => {
     console.log(`\n✅ Connected (protocol ${hello.protocol})`);
     console.log(`   Commands: /history, /status, /quit\n`);
-    rl.resume();
-    rl.prompt();
+    showPrompt();
   },
   onDisconnected: (code, reason) => {
     console.log(`\n❌ Disconnected: ${code} ${reason}`);
     process.exit(0);
   },
   onError: (err) => {
-    console.error(`\n⚠️  ${err.message}`);
+    process.stderr.write(`\n⚠️  ${err.message}\n`);
   },
 });
 
@@ -67,19 +52,15 @@ const chat = new ChatManager(
   (text) => {
     if (!responding) {
       responding = true;
-      // Pause readline to prevent prompt interference
-      rl.pause();
-      clearPrompt();
-      process.stdout.write("🤖 ");
+      // Clear current line and start response
+      process.stdout.write("\r\x1b[K🤖 ");
     }
     process.stdout.write(text);
-    resetStreamEndTimer();
   },
   // onFinal
   (text, emotions) => {
     if (!responding) {
-      clearPrompt();
-      process.stdout.write("🤖 ");
+      process.stdout.write("\r\x1b[K🤖 ");
       process.stdout.write(text);
     }
     if (emotions.length > 0) {
@@ -87,30 +68,51 @@ const chat = new ChatManager(
     }
     process.stdout.write("\n\n");
     responding = false;
-    rl.resume();
-    rl.prompt();
+    showPrompt();
   },
   // onError
   (msg) => {
-    clearPrompt();
-    console.error(`❌ Error: ${msg}\n`);
+    process.stdout.write(`\r\x1b[K❌ Error: ${msg}\n\n`);
     responding = false;
-    rl.resume();
-    rl.prompt();
+    showPrompt();
   },
 );
 
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-  prompt: "you> ",
+// Use raw stdin/stdout instead of readline to avoid prompt interference
+function showPrompt() {
+  process.stdout.write("you> ");
+}
+
+let inputBuffer = "";
+
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk: string) => {
+  // Handle each character
+  for (const ch of chunk) {
+    if (ch === "\n" || ch === "\r") {
+      process.stdout.write("\n");
+      handleInput(inputBuffer.trim());
+      inputBuffer = "";
+    } else if (ch === "\x7f" || ch === "\b") {
+      // Backspace
+      if (inputBuffer.length > 0) {
+        inputBuffer = inputBuffer.slice(0, -1);
+        process.stdout.write("\b \b");
+      }
+    } else if (ch === "\x03") {
+      // Ctrl+C
+      console.log("\nBye! 👋");
+      client.disconnect();
+      process.exit(0);
+    } else {
+      inputBuffer += ch;
+      process.stdout.write(ch);
+    }
+  }
 });
 
-rl.pause();
-
-rl.on("line", async (line) => {
-  const input = line.trim();
-  if (!input) { rl.prompt(); return; }
+async function handleInput(input: string) {
+  if (!input) { showPrompt(); return; }
 
   if (input === "/quit" || input === "/exit") {
     console.log("Bye! 👋");
@@ -122,7 +124,7 @@ rl.on("line", async (line) => {
     console.log(`  Connected: ${client.isConnected()}`);
     console.log(`  Gateway: ${GATEWAY_URL}`);
     console.log(`  Session: ${SESSION_KEY}\n`);
-    rl.prompt();
+    showPrompt();
     return;
   }
 
@@ -142,21 +144,22 @@ rl.on("line", async (line) => {
     } catch (err) {
       console.error(`  Error: ${err}\n`);
     }
-    rl.prompt();
+    showPrompt();
     return;
   }
 
   try {
     await chat.send(input);
+    // Response will come via events
   } catch (err) {
     console.error(`\n❌ Send failed: ${err}\n`);
-    rl.prompt();
+    showPrompt();
   }
-});
+}
 
-rl.on("close", () => {
-  client.disconnect();
-  process.exit(0);
-});
+// Enable raw mode for character-by-character input
+if (process.stdin.isTTY) {
+  process.stdin.setRawMode(true);
+}
 
 client.connect();

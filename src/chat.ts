@@ -18,17 +18,28 @@ export class ChatManager {
   ) {}
 
   handleChatEvent(payload: Record<string, unknown>): void {
+    // Filter by session key
+    const sk = payload.sessionKey as string | undefined;
+    if (sk && sk !== this.sessionKey) return;
+
+    const runId = payload.runId as string | undefined;
+    if (!runId) return;
+
     // Two formats:
     // 1. "chat" event: {runId, sessionKey, seq, state:"delta"|"final", message:{role,content}}
     // 2. "agent" event: {runId, sessionKey, stream:"assistant", data:{text,delta}, seq}
-    
-    const runId = payload.runId as string | undefined;
-    if (!runId) return;
 
     // Format 2: agent stream events
     if ("stream" in payload && "data" in payload) {
       const stream = payload.stream as string;
-      const data = payload.data as { text?: string; delta?: string } | undefined;
+      const data = payload.data as { text?: string; delta?: string; phase?: string } | undefined;
+      
+      // Lifecycle end = run complete
+      if (stream === "lifecycle" && data?.phase === "end") {
+        this.finishCurrentRun();
+        return;
+      }
+      
       if (stream === "assistant" && data?.delta) {
         if (this.currentRunId !== runId) {
           this.currentRunId = runId;
