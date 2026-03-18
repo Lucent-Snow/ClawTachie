@@ -5,15 +5,29 @@
   "type": "module",
   "scripts": {
     "dev": "tsx src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "cli:dev": "tsx src/index.ts",
+    "ui:dev": "vite --host 127.0.0.1 --port 1420",
+    "ui:build": "vite build",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json --noEmit"
   },
   "dependencies": {
+    "@noble/curves": "^2.0.1",
+    "@tauri-apps/api": "^2.10.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "tsx": "^4.20.5",
     "typescript": "^5.8.2",
     "ws": "^8.18.3"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.10.1",
     "@types/node": "^22.15.3",
-    "@types/ws": "^8.18.1"
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@types/ws": "^8.18.1",
+    "@vitejs/plugin-react": "^6.0.1",
+    "vite": "^8.0.0"
   }
 }
