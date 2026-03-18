@@ -86,3 +86,28 @@ export interface DeviceIdentity {
   privateKey: Uint8Array; // 32-byte raw Ed25519 private key
   publicKey: Uint8Array;  // 32-byte raw Ed25519 public key
 }
+
+// Sessions
+export interface SessionRow {
+  key: string;
+  kind: "direct" | "group";
+  displayName?: string;
+  updatedAt: number | null;
+  model?: string;
+  modelProvider?: string;
+}
+
+export interface SessionsListResult {
+  ts: number;
+  count: number;
+  sessions: SessionRow[];
+}
+
+// UI Message (normalized for display)
+export interface UIMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  emotions: string[];
+  timestamp: number;
+}

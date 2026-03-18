@@ -1,0 +1,73 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.panel {
+  width: 420px;
+  max-height: 80vh;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.title {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  margin-bottom: 20px;
+  color: var(--text);
+}
+
+.field {
+  margin-bottom: 16px;
+}
+
+.label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--primary-faint);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--text-base);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.input:focus {
+  border-color: var(--primary);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.primaryBtn {
+  padding: 8px 20px;
+  background: var(--primary);
+  color: var(--text-inverse);
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+.primaryBtn:hover { background: var(--primary-hover); }
+
+.secondaryBtn {
+  padding: 8px 20px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--primary-faint);
+  font-size: var(--text-sm);
+}

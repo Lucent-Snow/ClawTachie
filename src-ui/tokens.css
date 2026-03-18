@@ -1,0 +1,91 @@
+:root {
+  /* Primary — 9nine deep blue, the only chromatic hue */
+  --primary: #004789;
+  --primary-hover: #0c569a;
+  --primary-faint: rgba(0, 71, 137, 0.08);
+
+  /* Surface */
+  --surface: #ffffff;
+  --surface-tint: #f5f8fc;
+
+  /* Text */
+  --text: #1a1a2e;
+  --text-secondary: #5a6070;
+  --text-tertiary: #8b92a0;
+  --text-inverse: #ffffff;
+
+  /* Semantic */
+  --success: #2d8a56;
+  --error: #c0392b;
+
+  /* Shadow */
+  --shadow-card: 0 0 10px rgba(102, 113, 152, 0.1);
+
+  /* Fonts */
+  --font-ui: -apple-system, "Segoe UI", system-ui, sans-serif;
+  --font-body: "Noto Sans SC", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  --font-mono: "Fira Code", "Cascadia Code", "Consolas", monospace;
+
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 14px;
+  --text-md: 16px;
+  --text-lg: 20px;
+}
+
+/* Reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  color: var(--text);
+  background: var(--surface);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, textarea {
+  font: inherit;
+  border-radius: 0;
+}
+
+button {
+  border: 0;
+  cursor: pointer;
+}
+
+#root {
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Keyframes */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--text-tertiary);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}

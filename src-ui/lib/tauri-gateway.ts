@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { HelloOk } from "./types";
+import type { HelloOk, SessionsListResult } from "./types";
 
 export interface GatewayDisconnectedEvent {
   code: number;
@@ -40,17 +40,27 @@ export async function gatewayHistory(
   return invoke("gateway_history", { sessionKey, limit });
 }
 
+export async function gatewaySessionsList(): Promise<SessionsListResult> {
+  return invoke("gateway_sessions_list");
+}
+
+export async function gatewayChatAbort(sessionKey: string): Promise<void> {
+  await invoke("gateway_chat_abort", { sessionKey });
+}
+
 export async function subscribeGatewayEvents(listeners: {
   onChatEvent: (payload: Record<string, unknown>) => void;
   onRunEnd: () => void;
   onDisconnected: (payload: GatewayDisconnectedEvent) => void;
   onError: (payload: GatewayErrorEvent) => void;
+  onReconnecting?: () => void;
+  onConnected?: (payload: HelloOk) => void;
 }): Promise<UnlistenFn[]> {
   if (!hasTauriBackend()) {
     return [];
   }
 
-  return Promise.all([
+  const promises: Promise<UnlistenFn>[] = [
     listen<Record<string, unknown>>("gateway://chat", (event) => {
       listeners.onChatEvent(event.payload);
     }),
@@ -63,5 +73,16 @@ export async function subscribeGatewayEvents(listeners: {
     listen<GatewayErrorEvent>("gateway://error", (event) => {
       listeners.onError(event.payload);
     }),
-  ]);
+  ];
+
+  if (listeners.onReconnecting) {
+    const cb = listeners.onReconnecting;
+    promises.push(listen("gateway://reconnecting", () => cb()));
+  }
+  if (listeners.onConnected) {
+    const cb = listeners.onConnected;
+    promises.push(listen<HelloOk>("gateway://connected", (e) => cb(e.payload)));
+  }
+
+  return Promise.all(promises);
 }

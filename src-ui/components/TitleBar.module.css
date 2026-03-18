@@ -1,0 +1,64 @@
+.titlebar {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  background: var(--primary);
+  color: var(--text-inverse);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  user-select: none;
+}
+
+.drag {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.appName {
+  font-weight: 700;
+  font-size: var(--text-base);
+  letter-spacing: 0.02em;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-xs);
+  opacity: 0.85;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  background: currentColor;
+  transform: rotate(45deg);
+}
+
+.dot.connected { color: #6fdc8c; }
+.dot.reconnecting { color: #f1c21b; }
+.dot.error { color: #fa4d56; }
+.dot.disconnected { color: #8b92a0; }
+
+.iconBtn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--text-inverse);
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+.iconBtn:hover { opacity: 1; }

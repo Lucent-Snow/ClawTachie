@@ -1,0 +1,44 @@
+.sidebar {
+  width: 200px;
+  background: var(--primary);
+  color: var(--text-inverse);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+}
+
+.item {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  background: transparent;
+  color: var(--text-inverse);
+  text-align: left;
+  border: none;
+  border-left: 2px solid transparent;
+  opacity: 0.7;
+  transition: opacity 0.15s, border-color 0.15s;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.item:hover {
+  opacity: 0.9;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.item.active {
+  opacity: 1;
+  border-left-color: var(--text-inverse);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.empty {
+  padding: 14px;
+  opacity: 0.5;
+  font-size: var(--text-xs);
+}

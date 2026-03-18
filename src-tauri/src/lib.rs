@@ -9,6 +9,8 @@ pub fn run() {
       gateway::gateway_disconnect,
       gateway::gateway_send_message,
       gateway::gateway_history,
+      gateway::gateway_sessions_list,
+      gateway::gateway_chat_abort,
     ]);
 
   #[cfg(debug_assertions)]

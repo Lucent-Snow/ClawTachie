@@ -2,7 +2,10 @@ use std::{
     collections::HashMap,
     fs,
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
@@ -33,6 +36,7 @@ type WsStream = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 #[derive(Clone, Default)]
 pub struct GatewayState {
     connection: Arc<Mutex<Option<GatewayHandle>>>,
+    shutdown: Arc<Mutex<Option<Arc<AtomicBool>>>>,
 }
 
 #[derive(Clone)]
@@ -116,6 +120,13 @@ pub async fn gateway_connect(
     url: String,
     token: String,
 ) -> Result<HelloOk, String> {
+    // Cancel any existing reconnection loop
+    if let Ok(mut guard) = state.shutdown.lock() {
+        if let Some(flag) = guard.take() {
+            flag.store(true, Ordering::Relaxed);
+        }
+    }
+
     let old_connection = {
         let mut guard = state
             .connection
@@ -129,14 +140,21 @@ pub async fn gateway_connect(
     }
 
     let identity = load_or_create_identity()?;
-    let mut ws = connect_gateway(&url).await?;
-    let nonce = read_connect_challenge(&mut ws).await?;
-    let hello = perform_handshake(&mut ws, &identity, &token, &nonce).await?;
+    let (ws, hello) = connect_and_handshake(&url, &token, &identity).await?;
     let tick_interval_ms = hello
         .policy
         .as_ref()
         .and_then(|policy| policy.tick_interval_ms)
         .unwrap_or(DEFAULT_TICK_INTERVAL_MS);
+
+    let shutdown = Arc::new(AtomicBool::new(false));
+    {
+        let mut guard = state
+            .shutdown
+            .lock()
+            .map_err(|_| "gateway state poisoned".to_string())?;
+        *guard = Some(shutdown.clone());
+    }
 
     let (sender, receiver) = mpsc::unbounded_channel();
     {
@@ -150,12 +168,16 @@ pub async fn gateway_connect(
     }
 
     let state_ref = state.inner().clone();
-    tauri::async_runtime::spawn(run_gateway_loop(
+    tauri::async_runtime::spawn(run_gateway_with_reconnect(
         app.clone(),
         state_ref,
         ws,
         receiver,
         tick_interval_ms,
+        url,
+        token,
+        identity,
+        shutdown,
     ));
 
     app.emit("gateway://connected", &hello)
@@ -166,6 +188,13 @@ pub async fn gateway_connect(
 
 #[tauri::command]
 pub async fn gateway_disconnect(state: State<'_, GatewayState>) -> Result<(), String> {
+    // Signal reconnection loop to stop
+    if let Ok(guard) = state.shutdown.lock() {
+        if let Some(flag) = guard.as_ref() {
+            flag.store(true, Ordering::Relaxed);
+        }
+    }
+
     let connection = {
         let mut guard = state
             .connection
@@ -213,6 +242,29 @@ pub async fn gateway_history(
         .and_then(Value::as_array)
         .cloned()
         .unwrap_or_default())
+}
+
+#[tauri::command]
+pub async fn gateway_sessions_list(
+    state: State<'_, GatewayState>,
+) -> Result<Value, String> {
+    let params = json!({
+        "includeGlobal": false,
+        "includeUnknown": false,
+    });
+    send_request(state, "sessions.list", params).await
+}
+
+#[tauri::command]
+pub async fn gateway_chat_abort(
+    state: State<'_, GatewayState>,
+    session_key: String,
+) -> Result<(), String> {
+    let params = json!({
+        "sessionKey": session_key,
+    });
+    let _ = send_request(state, "chat.abort", params).await?;
+    Ok(())
 }
 
 async fn send_request(
@@ -378,16 +430,95 @@ async fn perform_handshake(
     Err("gateway closed before hello-ok".to_string())
 }
 
-async fn run_gateway_loop(
+async fn connect_and_handshake(
+    url: &str,
+    token: &str,
+    identity: &StoredIdentity,
+) -> Result<(WsStream, HelloOk), String> {
+    let mut ws = connect_gateway(url).await?;
+    let nonce = read_connect_challenge(&mut ws).await?;
+    let hello = perform_handshake(&mut ws, identity, token, &nonce).await?;
+    Ok((ws, hello))
+}
+
+async fn run_gateway_with_reconnect(
     app: AppHandle,
     state: GatewayState,
     ws: WsStream,
+    receiver: mpsc::UnboundedReceiver<GatewayCommand>,
+    tick_interval_ms: u64,
+    url: String,
+    token: String,
+    identity: StoredIdentity,
+    shutdown: Arc<AtomicBool>,
+) {
+    // Run initial connection
+    let user_quit = run_gateway_loop(&app, ws, receiver, tick_interval_ms).await;
+
+    if user_quit || shutdown.load(Ordering::Relaxed) {
+        cleanup_connection(&state);
+        return;
+    }
+
+    // Reconnection loop with exponential backoff
+    let mut backoff_ms: u64 = 1000;
+    loop {
+        let _ = app.emit("gateway://reconnecting", json!({}));
+        tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
+
+        if shutdown.load(Ordering::Relaxed) {
+            cleanup_connection(&state);
+            return;
+        }
+
+        match connect_and_handshake(&url, &token, &identity).await {
+            Ok((ws, hello)) => {
+                let tick_ms = hello
+                    .policy
+                    .as_ref()
+                    .and_then(|p| p.tick_interval_ms)
+                    .unwrap_or(DEFAULT_TICK_INTERVAL_MS);
+
+                let (sender, receiver) = mpsc::unbounded_channel();
+                if let Ok(mut guard) = state.connection.lock() {
+                    *guard = Some(GatewayHandle { sender });
+                }
+
+                let _ = app.emit("gateway://connected", &hello);
+                backoff_ms = 1000;
+
+                let user_quit =
+                    run_gateway_loop(&app, ws, receiver, tick_ms).await;
+
+                if user_quit || shutdown.load(Ordering::Relaxed) {
+                    cleanup_connection(&state);
+                    return;
+                }
+            }
+            Err(e) => {
+                emit_error(&app, &e);
+                backoff_ms = (backoff_ms * 2).min(30_000);
+            }
+        }
+    }
+}
+
+fn cleanup_connection(state: &GatewayState) {
+    if let Ok(mut guard) = state.connection.lock() {
+        *guard = None;
+    }
+}
+
+async fn run_gateway_loop(
+    app: &AppHandle,
+    ws: WsStream,
     mut receiver: mpsc::UnboundedReceiver<GatewayCommand>,
     tick_interval_ms: u64,
-) {
+) -> bool {
     let (mut writer, mut reader) = ws.split();
     let mut pending = HashMap::<String, oneshot::Sender<Result<Value, String>>>::new();
     let mut tick = tokio::time::interval(Duration::from_millis(tick_interval_ms));
+    let mut user_disconnect = false;
 
     loop {
         tokio::select! {
@@ -421,6 +552,7 @@ async fn run_gateway_loop(
                 pending.insert(request_id, response);
               }
               Some(GatewayCommand::Disconnect) | None => {
+                user_disconnect = true;
                 let _ = writer.send(Message::Close(None)).await;
                 break;
               }
@@ -459,9 +591,7 @@ async fn run_gateway_loop(
         let _ = response.send(Err("gateway loop stopped".to_string()));
     }
 
-    if let Ok(mut guard) = state.connection.lock() {
-        *guard = None;
-    }
+    user_disconnect
 }
 
 fn handle_incoming_frame(
