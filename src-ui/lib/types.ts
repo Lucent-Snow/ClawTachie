@@ -1,3 +1,5 @@
+import type { EmotionName } from "./emotions";
+
 // Gateway WebSocket protocol types (browser version)
 
 export interface RequestFrame {
@@ -103,11 +105,16 @@ export interface SessionsListResult {
   sessions: SessionRow[];
 }
 
+export interface CharacterSpriteAsset {
+  emotion: EmotionName;
+  path: string;
+}
+
 // UI Message (normalized for display)
 export interface UIMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
-  emotions: string[];
+  emotions: EmotionName[];
   timestamp: number;
 }

@@ -1,0 +1,132 @@
+.shell {
+  position: relative;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 12px;
+  background: transparent;
+  overflow: hidden;
+}
+
+.toolButton,
+.contextItem {
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--text);
+  border: 1px solid rgba(0, 71, 137, 0.16);
+  backdrop-filter: blur(10px);
+}
+
+.bubble {
+  align-self: stretch;
+  margin: 0 12px 12px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border-left: 2px solid var(--primary);
+  box-shadow: var(--shadow-card);
+  animation: fade-up 0.4s ease-out both;
+  z-index: 2;
+}
+
+.fadeLater {
+  transition: opacity 0.4s ease-out;
+}
+
+.emotionTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+  padding: 2px 6px;
+  background: var(--primary-faint);
+  color: var(--primary);
+  font-size: var(--text-xs);
+}
+
+.bubbleText {
+  color: var(--text);
+  font-size: var(--text-base);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.cursor {
+  display: inline-block;
+  margin-left: 2px;
+  animation: cursor-blink 1s infinite;
+}
+
+.spriteArea {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin: 0 8px;
+  cursor: grab;
+  user-select: none;
+}
+
+.inputBar {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  padding: 10px;
+  margin-top: 8px;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(12px);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+  z-index: 5;
+}
+
+.shell:hover .inputBar,
+.shell:focus-within .inputBar {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.input {
+  flex: 1;
+  min-height: 42px;
+  max-height: 120px;
+  padding: 10px 12px;
+  resize: none;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--primary-faint);
+  color: var(--text);
+  outline: none;
+}
+
+.input:focus {
+  border-color: var(--primary);
+}
+
+.sendButton {
+  width: 42px;
+  height: 42px;
+  background: var(--primary);
+  color: var(--text-inverse);
+  font-size: var(--text-md);
+}
+
+.sendButton:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.contextMenu {
+  position: absolute;
+  right: 12px;
+  bottom: 74px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-card);
+  z-index: 4;
+}

@@ -1,8 +1,7 @@
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { useChat } from "../stores/chat";
 import { useGateway } from "../stores/gateway";
 import { useAutoScroll } from "../hooks/useAutoScroll";
+import { getEmotionLabel } from "../lib/emotions";
 import { MessageBubble } from "./MessageBubble";
 import { Composer } from "./Composer";
 import styles from "./ChatView.module.css";
@@ -10,6 +9,7 @@ import styles from "./ChatView.module.css";
 export function ChatView() {
   const messages = useChat((s) => s.messages);
   const streamingText = useChat((s) => s.streamingText);
+  const streamingEmotion = useChat((s) => s.streamingEmotion);
   const isStreaming = useChat((s) => s.isStreaming);
   const currentKey = useGateway((s) => s.currentSessionKey);
   const sessions = useGateway((s) => s.sessions);
@@ -38,11 +38,14 @@ export function ChatView() {
         {messages.map((m) => (
           <MessageBubble key={m.id} message={m} />
         ))}
-        {isStreaming && streamingText && (
+        {isStreaming && (streamingText || streamingEmotion) && (
           <div className={styles.streaming}>
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {streamingText}
-            </ReactMarkdown>
+            {streamingEmotion && (
+              <div className={styles.emotionTag}>
+                &#9670; {getEmotionLabel(streamingEmotion)}
+              </div>
+            )}
+            <div className={styles.streamingText}>{streamingText}</div>
             <span className={styles.cursor}>&#9612;</span>
           </div>
         )}

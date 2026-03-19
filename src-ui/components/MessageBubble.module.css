@@ -1,4 +1,5 @@
 .bubble {
+  position: relative;
   max-width: 80%;
   padding: 10px 14px;
   font-size: var(--text-base);
@@ -18,6 +19,18 @@
   align-self: flex-start;
   background: var(--surface-tint);
   border-left: 2px solid var(--primary);
+}
+
+.emotionTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+  padding: 2px 6px;
+  background: var(--primary-faint);
+  color: var(--primary);
+  font-size: var(--text-xs);
+  line-height: 1.2;
 }
 
 /* Markdown inside assistant bubbles */

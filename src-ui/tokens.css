@@ -64,6 +64,11 @@ button {
   overflow: hidden;
 }
 
+body[data-window="pet"],
+body[data-window="pet"] #root {
+  background: transparent;
+}
+
 /* Keyframes */
 @keyframes fade-up {
   from { opacity: 0; transform: translateY(12px); }

@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import type { UIMessage, ChatEvent } from "../lib/types";
-import { parseEmotions } from "../lib/emotion";
+import { createStreamingParser, parseEmotions } from "../lib/emotion";
+import { type EmotionName } from "../lib/emotions";
+import { broadcastUserMessage } from "../lib/window-sync";
 import {
   gatewaySendMessage,
   gatewayHistory,
@@ -25,17 +27,38 @@ function extractContent(message: unknown): string | null {
   return null;
 }
 
-let streamBuffer = "";
+let rawStreamBuffer = "";
+const streamingParser = createStreamingParser();
+
+function getLatestEmotion(emotions: EmotionName[]): EmotionName | null {
+  return emotions.at(-1) ?? null;
+}
+
+function resetStreamingState() {
+  rawStreamBuffer = "";
+  streamingParser.reset();
+}
+
+function deriveEmotionFromHistory(messages: UIMessage[]): EmotionName {
+  const latestAssistant = [...messages]
+    .reverse()
+    .find((message) => message.role === "assistant" && message.emotions.length > 0);
+
+  return getLatestEmotion(latestAssistant?.emotions ?? []) ?? "normal";
+}
 
 interface ChatState {
   messages: UIMessage[];
   streamingText: string;
+  streamingEmotion: EmotionName | null;
+  currentEmotion: EmotionName;
   isStreaming: boolean;
   currentRunId: string | null;
   send: (sessionKey: string, text: string) => Promise<void>;
   abort: (sessionKey: string) => Promise<void>;
   loadHistory: (sessionKey: string) => Promise<void>;
   clearMessages: () => void;
+  appendExternalUserMessage: (message: UIMessage) => void;
   handleChatEvent: (payload: Record<string, unknown>, sessionKey: string) => void;
   finalizeStream: () => void;
 }
@@ -43,6 +66,8 @@ interface ChatState {
 export const useChat = create<ChatState>()((set, get) => ({
   messages: [],
   streamingText: "",
+  streamingEmotion: null,
+  currentEmotion: "normal",
   isStreaming: false,
   currentRunId: null,
 
@@ -55,9 +80,28 @@ export const useChat = create<ChatState>()((set, get) => ({
       timestamp: Date.now(),
     };
     set((s) => ({ messages: [...s.messages, userMsg] }));
-    streamBuffer = "";
-    set({ streamingText: "", isStreaming: false });
-    await gatewaySendMessage(sessionKey, text);
+    resetStreamingState();
+    set({
+      streamingText: "",
+      streamingEmotion: null,
+      currentEmotion: "thinking",
+      isStreaming: false,
+    });
+    try {
+      await gatewaySendMessage(sessionKey, text);
+      void broadcastUserMessage(sessionKey, userMsg);
+    } catch {
+      set((state) => {
+        const messages = state.messages.filter((message) => message.id !== userMsg.id);
+        return {
+          messages,
+          currentEmotion: deriveEmotionFromHistory(messages),
+          streamingText: "",
+          streamingEmotion: null,
+          isStreaming: false,
+        };
+      });
+    }
   },
 
   abort: async (sessionKey) => {
@@ -81,12 +125,38 @@ export const useChat = create<ChatState>()((set, get) => ({
         };
       })
       .filter((m: UIMessage) => m.content.trim() !== "");
-    set({ messages });
+    set({
+      messages,
+      currentEmotion: deriveEmotionFromHistory(messages),
+      streamingEmotion: null,
+      streamingText: "",
+      isStreaming: false,
+    });
   },
 
   clearMessages: () => {
-    streamBuffer = "";
-    set({ messages: [], streamingText: "", isStreaming: false, currentRunId: null });
+    resetStreamingState();
+    set({
+      messages: [],
+      streamingText: "",
+      streamingEmotion: null,
+      currentEmotion: "normal",
+      isStreaming: false,
+      currentRunId: null,
+    });
+  },
+
+  appendExternalUserMessage: (message) => {
+    set((state) => {
+      if (state.messages.some((item) => item.id === message.id)) {
+        return state;
+      }
+
+      return {
+        messages: [...state.messages, message],
+        currentEmotion: "thinking" as const,
+      };
+    });
   },
 
   handleChatEvent: (payload, sessionKey) => {
@@ -105,8 +175,14 @@ export const useChat = create<ChatState>()((set, get) => ({
         return;
       }
       if (stream === "assistant" && data?.delta) {
-        streamBuffer += data.delta;
-        set({ streamingText: streamBuffer, isStreaming: true });
+        rawStreamBuffer += data.delta;
+        const parsed = streamingParser.feed(data.delta);
+        set((state) => ({
+          streamingText: state.streamingText + parsed.text,
+          streamingEmotion: parsed.emotion ?? state.streamingEmotion,
+          currentEmotion: parsed.emotion ?? state.currentEmotion,
+          isStreaming: true,
+        }));
       }
       return;
     }
@@ -117,8 +193,16 @@ export const useChat = create<ChatState>()((set, get) => ({
       case "delta": {
         const content = extractContent(evt.message);
         if (content) {
-          streamBuffer = content;
-          set({ streamingText: content, isStreaming: true });
+          resetStreamingState();
+          rawStreamBuffer = content;
+
+          const parsed = streamingParser.feed(content);
+          set({
+            streamingText: parsed.text,
+            streamingEmotion: parsed.emotion,
+            currentEmotion: parsed.emotion ?? get().currentEmotion,
+            isStreaming: true,
+          });
         }
         break;
       }
@@ -127,18 +211,30 @@ export const useChat = create<ChatState>()((set, get) => ({
         break;
       case "error":
       case "aborted":
-        streamBuffer = "";
-        set({ streamingText: "", isStreaming: false });
+        resetStreamingState();
+        set({
+          streamingText: "",
+          streamingEmotion: null,
+          currentEmotion: "normal",
+          isStreaming: false,
+        });
         break;
     }
   },
 
   finalizeStream: () => {
-    const text = streamBuffer || get().streamingText;
+    const text = rawStreamBuffer;
     if (!text) {
-      set({ isStreaming: false });
+      resetStreamingState();
+      set({
+        streamingText: "",
+        streamingEmotion: null,
+        currentEmotion: "normal",
+        isStreaming: false,
+      });
       return;
     }
+
     const parsed = parseEmotions(text);
     const msg: UIMessage = {
       id: crypto.randomUUID(),
@@ -147,10 +243,13 @@ export const useChat = create<ChatState>()((set, get) => ({
       emotions: parsed.emotions,
       timestamp: Date.now(),
     };
-    streamBuffer = "";
+    const latestEmotion = getLatestEmotion(parsed.emotions) ?? "normal";
+    resetStreamingState();
     set((s) => ({
       messages: [...s.messages, msg],
       streamingText: "",
+      streamingEmotion: null,
+      currentEmotion: latestEmotion,
       isStreaming: false,
       currentRunId: null,
     }));

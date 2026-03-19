@@ -1,10 +1,33 @@
+mod characters;
 mod gateway;
+
+use tauri::{AppHandle, Manager};
+
+#[tauri::command]
+fn show_main_window(app: AppHandle) -> Result<(), String> {
+  let window = app
+    .get_webview_window("main")
+    .ok_or_else(|| "main window not found".to_string())?;
+
+  window.show().map_err(|err| err.to_string())?;
+  window.unminimize().map_err(|err| err.to_string())?;
+  window.set_focus().map_err(|err| err.to_string())?;
+  Ok(())
+}
+
+#[tauri::command]
+fn start_current_window_dragging(window: tauri::Window) -> Result<(), String> {
+  window.start_dragging().map_err(|err| err.to_string())
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   let mut builder = tauri::Builder::default()
     .manage(gateway::GatewayState::default())
     .invoke_handler(tauri::generate_handler![
+      characters::load_character_sprites,
+      show_main_window,
+      start_current_window_dragging,
       gateway::gateway_connect,
       gateway::gateway_disconnect,
       gateway::gateway_send_message,

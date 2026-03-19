@@ -1,6 +1,10 @@
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { HelloOk, SessionsListResult } from "./types";
+import type {
+  CharacterSpriteAsset,
+  HelloOk,
+  SessionsListResult,
+} from "./types";
 
 export interface GatewayDisconnectedEvent {
   code: number;
@@ -46,6 +50,22 @@ export async function gatewaySessionsList(): Promise<SessionsListResult> {
 
 export async function gatewayChatAbort(sessionKey: string): Promise<void> {
   await invoke("gateway_chat_abort", { sessionKey });
+}
+
+export async function loadCharacterSprites(): Promise<CharacterSpriteAsset[]> {
+  const assets = await invoke<CharacterSpriteAsset[]>("load_character_sprites");
+  return assets.map((asset) => ({
+    ...asset,
+    path: convertFileSrc(asset.path),
+  }));
+}
+
+export async function showMainWindow(): Promise<void> {
+  await invoke("show_main_window");
+}
+
+export async function startCurrentWindowDragging(): Promise<void> {
+  await invoke("start_current_window_dragging");
 }
 
 export async function subscribeGatewayEvents(listeners: {

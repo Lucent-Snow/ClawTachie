@@ -13,7 +13,7 @@ export const useSettings = create<SettingsState>()(
     (set) => ({
       gatewayUrl: "ws://127.0.0.1:18789",
       token: "",
-      sessionKey: "agent:main:clawtachie",
+      sessionKey: "agent:clawtachie:main",
       update: (partial) => set(partial),
     }),
     { name: "clawtachie-settings" },

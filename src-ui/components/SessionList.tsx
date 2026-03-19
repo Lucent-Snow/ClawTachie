@@ -1,6 +1,7 @@
 import { useGateway } from "../stores/gateway";
 import { useChat } from "../stores/chat";
 import { useSettings } from "../stores/settings";
+import { broadcastSessionChange } from "../lib/window-sync";
 import styles from "./SessionList.module.css";
 
 function displayName(key: string, name?: string): string {
@@ -21,6 +22,7 @@ export function SessionList() {
     if (key === currentKey) return;
     switchSession(key);
     updateSettings({ sessionKey: key });
+    void broadcastSessionChange(key);
     clearMessages();
     loadHistory(key);
   };

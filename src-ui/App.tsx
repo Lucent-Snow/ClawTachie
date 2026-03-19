@@ -1,19 +1,33 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useSettings } from "./stores/settings";
 import { useGateway } from "./stores/gateway";
 import { useChat } from "./stores/chat";
 import { subscribeGatewayEvents } from "./lib/tauri-gateway";
-import { TitleBar } from "./components/TitleBar";
-import { SessionList } from "./components/SessionList";
-import { ChatView } from "./components/ChatView";
-import { SettingsModal } from "./components/SettingsModal";
+import { subscribeWindowSync } from "./lib/window-sync";
+import { MainWindow } from "./windows/MainWindow";
+import { PetWindow } from "./windows/PetWindow";
+
+const currentWindow = getCurrentWindow();
 
 export function App() {
-  const [showSettings, setShowSettings] = useState(false);
   const settings = useSettings();
   const { setStatus, switchSession, refreshSessions, status } = useGateway();
-  const { handleChatEvent, finalizeStream, clearMessages, loadHistory } = useChat();
+  const {
+    appendExternalUserMessage,
+    handleChatEvent,
+    finalizeStream,
+    clearMessages,
+    loadHistory,
+  } = useChat();
   const currentSessionKey = useGateway((s) => s.currentSessionKey);
+  const isPetWindow = currentWindow.label === "pet";
+
+  useEffect(() => {
+    if (settings.sessionKey === "agent:main:clawtachie") {
+      settings.update({ sessionKey: "agent:clawtachie:main" });
+    }
+  }, [settings]);
 
   // Set initial session from settings
   useEffect(() => {
@@ -56,6 +70,47 @@ export function App() {
     return () => { cancelled = true; unlisteners.forEach((f) => f()); };
   }, [setStatus, handleChatEvent, finalizeStream, refreshSessions]);
 
+  useEffect(() => {
+    let cancelled = false;
+    let unlisteners: (() => void)[] = [];
+
+    void subscribeWindowSync({
+      onSessionChange: ({ sessionKey }) => {
+        if (sessionKey === useGateway.getState().currentSessionKey) {
+          return;
+        }
+
+        useSettings.getState().update({ sessionKey });
+        useGateway.getState().switchSession(sessionKey);
+        useChat.getState().clearMessages();
+
+        const gatewayStatus = useGateway.getState().status;
+        if (gatewayStatus === "connected") {
+          void useChat.getState().loadHistory(sessionKey);
+        }
+      },
+      onUserMessage: ({ sessionKey, message }) => {
+        if (sessionKey !== useGateway.getState().currentSessionKey) {
+          return;
+        }
+
+        useChat.getState().appendExternalUserMessage(message);
+      },
+    }).then((fns) => {
+      if (cancelled) {
+        fns.forEach((fn) => fn());
+        return;
+      }
+
+      unlisteners = fns;
+    });
+
+    return () => {
+      cancelled = true;
+      unlisteners.forEach((fn) => fn());
+    };
+  }, [appendExternalUserMessage]);
+
   // Load history when session changes
   useEffect(() => {
     if (currentSessionKey && status === "connected") {
@@ -64,14 +119,9 @@ export function App() {
     }
   }, [currentSessionKey, status, clearMessages, loadHistory]);
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
-      <TitleBar onOpenSettings={() => setShowSettings(true)} />
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-        <SessionList />
-        <ChatView />
-      </div>
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
-    </div>
-  );
+  useEffect(() => {
+    document.body.dataset.window = isPetWindow ? "pet" : "main";
+  }, [isPetWindow]);
+
+  return isPetWindow ? <PetWindow /> : <MainWindow />;
 }

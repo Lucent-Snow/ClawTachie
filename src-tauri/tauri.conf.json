@@ -13,6 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
+        "label": "main",
         "title": "ClawTachie",
         "width": 1280,
         "height": 820,
@@ -20,10 +21,33 @@
         "minHeight": 640,
         "resizable": true,
         "fullscreen": false,
-        "decorations": false
+        "decorations": false,
+        "visible": false
+      },
+      {
+        "label": "pet",
+        "title": "ClawTachie Pet",
+        "width": 320,
+        "height": 520,
+        "minWidth": 280,
+        "minHeight": 420,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "shadow": false
       }
     ],
     "security": {
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$HOME/.clawtachie/characters/**/*",
+          "$DOCUMENT/ZcChat/characters/**/*",
+          "$RESOURCE/**/*"
+        ]
+      },
       "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost ws://127.0.0.1:* http://127.0.0.1:*; img-src 'self' asset: http://asset.localhost blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self';"
     }
   },
