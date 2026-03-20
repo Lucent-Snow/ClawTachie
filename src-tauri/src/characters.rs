@@ -40,7 +40,12 @@ fn find_character_directory() -> Option<PathBuf> {
     let mut candidates = Vec::new();
 
     if let Some(home_dir) = dirs::home_dir() {
-        candidates.push(home_dir.join(".clawtachie").join("characters").join("default"));
+        candidates.push(
+            home_dir
+                .join(".clawtachie")
+                .join("characters")
+                .join("default"),
+        );
     }
 
     if let Some(document_dir) = dirs::document_dir() {
@@ -74,7 +79,9 @@ fn build_file_index(root_dir: &Path) -> Result<HashMap<String, PathBuf>, String>
             continue;
         };
 
-        index.entry(stem.to_string()).or_insert_with(|| path.clone());
+        index
+            .entry(stem.to_string())
+            .or_insert_with(|| path.clone());
         index
             .entry(stem.to_lowercase())
             .or_insert_with(|| path.clone());

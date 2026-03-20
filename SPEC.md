@@ -87,7 +87,7 @@ Method: `chat.send`
   "id": "<uuid>",
   "method": "chat.send",
   "params": {
-    "sessionKey": "agent:main:clawtachie",
+    "sessionKey": "agent:clawtachie:main",
     "message": "Hello from desktop pet!",
     "idempotencyKey": "<uuid>"
   }
@@ -103,7 +103,7 @@ The server broadcasts `chat` events:
   "event": "chat",
   "payload": {
     "runId": "<uuid>",
-    "sessionKey": "agent:main:clawtachie",
+    "sessionKey": "agent:clawtachie:main",
     "seq": 1,
     "state": "delta",
     "message": { "role": "assistant", "content": "partial text..." }
@@ -122,7 +122,7 @@ Method: `chat.history`
   "id": "<uuid>",
   "method": "chat.history",
   "params": {
-    "sessionKey": "agent:main:clawtachie",
+    "sessionKey": "agent:clawtachie:main",
     "limit": 20
   }
 }
@@ -161,7 +161,7 @@ Parse these out and display them separately:
 Read from environment variables:
 - `OPENCLAW_GATEWAY_URL` — WebSocket URL (default: `ws://127.0.0.1:18789`)
 - `OPENCLAW_GATEWAY_TOKEN` — Auth token (required)
-- `CIEL_PET_SESSION` — Session key (default: `agent:main:clawtachie`)
+- `CLAWTACHIE_SESSION` — Session key (default: `agent:clawtachie:main`)
 
 ## File Structure
 

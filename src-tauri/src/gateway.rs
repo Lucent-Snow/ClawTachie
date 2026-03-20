@@ -11,8 +11,8 @@ use std::{
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use ed25519_dalek::{
-  pkcs8::{DecodePrivateKey, DecodePublicKey, EncodePrivateKey, EncodePublicKey},
-  Signature, Signer, SigningKey, VerifyingKey,
+    pkcs8::{DecodePrivateKey, DecodePublicKey, EncodePrivateKey, EncodePublicKey},
+    Signature, Signer, SigningKey, VerifyingKey,
 };
 use futures_util::{SinkExt, StreamExt};
 use pkcs8::LineEnding;
@@ -55,13 +55,13 @@ enum GatewayCommand {
 
 #[derive(Clone, Debug, Serialize)]
 struct GatewayDisconnectedEvent {
-  code: u16,
-  reason: String,
+    code: u16,
+    reason: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
 struct GatewayErrorEvent {
-  message: String,
+    message: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -245,9 +245,7 @@ pub async fn gateway_history(
 }
 
 #[tauri::command]
-pub async fn gateway_sessions_list(
-    state: State<'_, GatewayState>,
-) -> Result<Value, String> {
+pub async fn gateway_sessions_list(state: State<'_, GatewayState>) -> Result<Value, String> {
     let params = json!({
         "includeGlobal": false,
         "includeUnknown": false,
@@ -487,8 +485,7 @@ async fn run_gateway_with_reconnect(
                 let _ = app.emit("gateway://connected", &hello);
                 backoff_ms = 1000;
 
-                let user_quit =
-                    run_gateway_loop(&app, ws, receiver, tick_ms).await;
+                let user_quit = run_gateway_loop(&app, ws, receiver, tick_ms).await;
 
                 if user_quit || shutdown.load(Ordering::Relaxed) {
                     cleanup_connection(&state);
@@ -668,6 +665,7 @@ fn close_reason(frame: Option<(u16, String)>) -> String {
 
 fn load_or_create_identity() -> Result<StoredIdentity, String> {
     let path = identity_path()?;
+
     if path.exists() {
         let raw = fs::read_to_string(&path).map_err(|err| err.to_string())?;
         let parsed: StoredIdentity = serde_json::from_str(&raw).map_err(|err| err.to_string())?;
@@ -710,7 +708,7 @@ fn load_or_create_identity() -> Result<StoredIdentity, String> {
 
 fn identity_path() -> Result<PathBuf, String> {
     let home = dirs::home_dir().ok_or_else(|| "failed to resolve home directory".to_string())?;
-    Ok(home.join(".ciel-pet").join("device.json"))
+    Ok(home.join(".clawtachie").join("device.json"))
 }
 
 fn fingerprint_public_key(public_key_pem: &str) -> Result<String, String> {

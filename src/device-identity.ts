@@ -8,7 +8,7 @@ import os from "node:os";
 import type { DeviceIdentity, StoredIdentity } from "./types.js";
 
 const ED25519_SPKI_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
-const IDENTITY_DIR = path.join(os.homedir(), ".ciel-pet");
+const IDENTITY_DIR = path.join(os.homedir(), ".clawtachie");
 const IDENTITY_FILE = path.join(IDENTITY_DIR, "device.json");
 
 function base64UrlEncode(buf: Buffer): string {

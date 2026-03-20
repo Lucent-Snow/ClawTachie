@@ -7,7 +7,7 @@ import { ChatManager } from "./chat.js";
 
 const GATEWAY_URL = process.env["OPENCLAW_GATEWAY_URL"] ?? "ws://127.0.0.1:18789";
 const GATEWAY_TOKEN = process.env["OPENCLAW_GATEWAY_TOKEN"];
-const SESSION_KEY = process.env["CIEL_PET_SESSION"] ?? "agent:main:clawtachie";
+const SESSION_KEY = process.env["CLAWTACHIE_SESSION"] ?? "agent:clawtachie:main";
 
 if (!GATEWAY_TOKEN) {
   console.error("Error: OPENCLAW_GATEWAY_TOKEN is required");
