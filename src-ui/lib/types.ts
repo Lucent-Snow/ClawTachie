@@ -1,4 +1,4 @@
-import type { EmotionName } from "./emotions";
+import type { TachieName } from "./emotions";
 
 // Gateway WebSocket protocol types (browser version)
 
@@ -106,7 +106,7 @@ export interface SessionsListResult {
 }
 
 export interface CharacterSpriteAsset {
-  emotion: EmotionName;
+  emotion: TachieName;
   path: string;
 }
 
@@ -115,6 +115,25 @@ export interface UIMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
-  emotions: EmotionName[];
+  tachie: TachieName | null;
+  style: string | null;
   timestamp: number;
+}
+
+export type TtsProvider = "none" | "mimo";
+
+export interface TtsSynthesizeRequest {
+  provider: Exclude<TtsProvider, "none">;
+  text: string;
+  style?: string | null;
+  apiKey?: string;
+  voice?: string;
+  model?: string;
+  scriptPath?: string;
+  userContext?: string;
+}
+
+export interface TtsSynthesizeResponse {
+  path: string;
+  assetUrl: string;
 }

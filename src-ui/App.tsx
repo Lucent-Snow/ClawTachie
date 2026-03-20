@@ -12,7 +12,7 @@ const currentWindow = getCurrentWindow();
 
 export function App() {
   const settings = useSettings();
-  const { setStatus, switchSession, refreshSessions, status } = useGateway();
+  const { setStatus, switchSession, refreshSessions, status, connect } = useGateway();
   const {
     appendExternalUserMessage,
     handleChatEvent,
@@ -23,18 +23,22 @@ export function App() {
   const currentSessionKey = useGateway((s) => s.currentSessionKey);
   const isPetWindow = currentWindow.label === "pet";
 
-  useEffect(() => {
-    if (settings.sessionKey === "agent:main:clawtachie") {
-      settings.update({ sessionKey: "agent:clawtachie:main" });
-    }
-  }, [settings]);
-
   // Set initial session from settings
   useEffect(() => {
-    if (!currentSessionKey && settings.sessionKey) {
-      switchSession(settings.sessionKey);
+    if (!currentSessionKey && settings.gateway.sessionKey) {
+      switchSession(settings.gateway.sessionKey);
     }
-  }, [currentSessionKey, settings.sessionKey, switchSession]);
+  }, [currentSessionKey, settings.gateway.sessionKey, switchSession]);
+
+  // Auto-connect on startup
+  useEffect(() => {
+    const { url, token, autoConnect } = settings.gateway;
+    if (autoConnect && token && status === "disconnected") {
+      void connect(url, token);
+    }
+    // Only run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Subscribe to Tauri gateway events
   useEffect(() => {
@@ -79,15 +83,7 @@ export function App() {
         if (sessionKey === useGateway.getState().currentSessionKey) {
           return;
         }
-
-        useSettings.getState().update({ sessionKey });
         useGateway.getState().switchSession(sessionKey);
-        useChat.getState().clearMessages();
-
-        const gatewayStatus = useGateway.getState().status;
-        if (gatewayStatus === "connected") {
-          void useChat.getState().loadHistory(sessionKey);
-        }
       },
       onUserMessage: ({ sessionKey, message }) => {
         if (sessionKey !== useGateway.getState().currentSessionKey) {
@@ -95,6 +91,9 @@ export function App() {
         }
 
         useChat.getState().appendExternalUserMessage(message);
+      },
+      onSettingsChange: ({ settings: nextSettings }) => {
+        useSettings.getState().applySnapshot(nextSettings);
       },
     }).then((fns) => {
       if (cancelled) {

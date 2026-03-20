@@ -29,16 +29,17 @@
 .messages {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  overflow-x: hidden;
+  padding: 40px 80px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 30px;
 }
 
 .streaming {
   align-self: flex-start;
   max-width: 80%;
-  padding: 10px 14px;
+  padding: 20px 30px;
   background: var(--surface-tint);
   border-left: 2px solid var(--primary);
   font-size: var(--text-base);

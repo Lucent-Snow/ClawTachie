@@ -1,4 +1,4 @@
-export const EMOTION_SET = [
+export const TACHIE_SET = [
   "normal",
   "smile",
   "happy",
@@ -9,9 +9,9 @@ export const EMOTION_SET = [
   "shy",
 ] as const;
 
-export type EmotionName = (typeof EMOTION_SET)[number];
+export type TachieName = (typeof TACHIE_SET)[number];
 
-export const EMOTION_LABELS: Record<EmotionName, string> = {
+export const TACHIE_LABELS: Record<TachieName, string> = {
   normal: "normal",
   smile: "smile",
   happy: "happy",
@@ -22,7 +22,7 @@ export const EMOTION_LABELS: Record<EmotionName, string> = {
   shy: "shy",
 };
 
-export const ZC_EMOTION_MAP: Record<string, EmotionName> = {
+export const ZC_TACHIE_MAP: Record<string, TachieName> = {
   正常: "normal",
   微笑: "smile",
   开心: "happy",
@@ -33,7 +33,7 @@ export const ZC_EMOTION_MAP: Record<string, EmotionName> = {
   害羞: "shy",
 };
 
-const EMOTION_ALIASES: Record<string, EmotionName> = {
+const TACHIE_ALIASES: Record<string, TachieName> = {
   normal: "normal",
   calm: "normal",
   neutral: "normal",
@@ -76,14 +76,21 @@ const EMOTION_ALIASES: Record<string, EmotionName> = {
   尴尬: "shy",
 };
 
-export function normalizeEmotionName(value: string | null | undefined): EmotionName | null {
+export function normalizeTachieName(value: string | null | undefined): TachieName | null {
   if (!value) {
     return null;
   }
 
-  return EMOTION_ALIASES[value.trim().toLowerCase()] ?? EMOTION_ALIASES[value.trim()] ?? null;
+  return TACHIE_ALIASES[value.trim().toLowerCase()] ?? TACHIE_ALIASES[value.trim()] ?? null;
 }
 
-export function getEmotionLabel(value: EmotionName): string {
-  return EMOTION_LABELS[value];
+export function getTachieLabel(value: TachieName): string {
+  return TACHIE_LABELS[value];
 }
+
+export const EMOTION_SET = TACHIE_SET;
+export type EmotionName = TachieName;
+export const EMOTION_LABELS = TACHIE_LABELS;
+export const ZC_EMOTION_MAP = ZC_TACHIE_MAP;
+export const normalizeEmotionName = normalizeTachieName;
+export const getEmotionLabel = getTachieLabel;

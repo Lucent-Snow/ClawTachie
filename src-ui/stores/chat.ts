@@ -1,13 +1,14 @@
 import { create } from "zustand";
 import type { UIMessage, ChatEvent } from "../lib/types";
-import { createStreamingParser, parseEmotions } from "../lib/emotion";
-import { type EmotionName } from "../lib/emotions";
+import { createStreamingParser, parseMessageTags } from "../lib/emotion";
+import { type TachieName } from "../lib/emotions";
 import { broadcastUserMessage } from "../lib/window-sync";
 import {
   gatewaySendMessage,
   gatewayHistory,
   gatewayChatAbort,
 } from "../lib/tauri-gateway";
+import { useTts } from "./tts";
 
 function extractContent(message: unknown): string | null {
   if (!message || typeof message !== "object") return null;
@@ -30,8 +31,12 @@ function extractContent(message: unknown): string | null {
 let rawStreamBuffer = "";
 const streamingParser = createStreamingParser();
 
-function getLatestEmotion(emotions: EmotionName[]): EmotionName | null {
-  return emotions.at(-1) ?? null;
+function deriveTachieFromHistory(messages: UIMessage[]): TachieName {
+  const latestAssistant = [...messages]
+    .reverse()
+    .find((message) => message.role === "assistant" && message.tachie);
+
+  return latestAssistant?.tachie ?? "normal";
 }
 
 function resetStreamingState() {
@@ -39,21 +44,15 @@ function resetStreamingState() {
   streamingParser.reset();
 }
 
-function deriveEmotionFromHistory(messages: UIMessage[]): EmotionName {
-  const latestAssistant = [...messages]
-    .reverse()
-    .find((message) => message.role === "assistant" && message.emotions.length > 0);
-
-  return getLatestEmotion(latestAssistant?.emotions ?? []) ?? "normal";
-}
-
 interface ChatState {
   messages: UIMessage[];
   streamingText: string;
-  streamingEmotion: EmotionName | null;
-  currentEmotion: EmotionName;
+  streamingTachie: TachieName | null;
+  streamingStyle: string | null;
+  currentTachie: TachieName;
   isStreaming: boolean;
   currentRunId: string | null;
+  lastGeneratedAssistantMessageId: string | null;
   send: (sessionKey: string, text: string) => Promise<void>;
   abort: (sessionKey: string) => Promise<void>;
   loadHistory: (sessionKey: string) => Promise<void>;
@@ -66,25 +65,31 @@ interface ChatState {
 export const useChat = create<ChatState>()((set, get) => ({
   messages: [],
   streamingText: "",
-  streamingEmotion: null,
-  currentEmotion: "normal",
+  streamingTachie: null,
+  streamingStyle: null,
+  currentTachie: "normal",
   isStreaming: false,
   currentRunId: null,
+  lastGeneratedAssistantMessageId: null,
 
   send: async (sessionKey, text) => {
+    useTts.getState().stop();
+
     const userMsg: UIMessage = {
       id: crypto.randomUUID(),
       role: "user",
       content: text,
-      emotions: [],
+      tachie: null,
+      style: null,
       timestamp: Date.now(),
     };
     set((s) => ({ messages: [...s.messages, userMsg] }));
     resetStreamingState();
     set({
       streamingText: "",
-      streamingEmotion: null,
-      currentEmotion: "thinking",
+      streamingTachie: null,
+      streamingStyle: null,
+      currentTachie: "thinking",
       isStreaming: false,
     });
     try {
@@ -95,9 +100,10 @@ export const useChat = create<ChatState>()((set, get) => ({
         const messages = state.messages.filter((message) => message.id !== userMsg.id);
         return {
           messages,
-          currentEmotion: deriveEmotionFromHistory(messages),
+          currentTachie: deriveTachieFromHistory(messages),
           streamingText: "",
-          streamingEmotion: null,
+          streamingTachie: null,
+          streamingStyle: null,
           isStreaming: false,
         };
       });
@@ -115,22 +121,25 @@ export const useChat = create<ChatState>()((set, get) => ({
       .map((item: unknown) => {
         const m = item as Record<string, unknown>;
         const content = extractContent(m) ?? "";
-        const parsed = parseEmotions(content);
+        const parsed = parseMessageTags(content);
         return {
           id: (m.id as string) ?? crypto.randomUUID(),
           role: (m.role as "user" | "assistant") ?? "assistant",
           content: parsed.text,
-          emotions: parsed.emotions,
+          tachie: parsed.tachie,
+          style: parsed.style,
           timestamp: (m.createdAt as number) ?? Date.now(),
         };
       })
       .filter((m: UIMessage) => m.content.trim() !== "");
     set({
       messages,
-      currentEmotion: deriveEmotionFromHistory(messages),
-      streamingEmotion: null,
+      currentTachie: deriveTachieFromHistory(messages),
+      streamingTachie: null,
+      streamingStyle: null,
       streamingText: "",
       isStreaming: false,
+      lastGeneratedAssistantMessageId: null,
     });
   },
 
@@ -139,10 +148,12 @@ export const useChat = create<ChatState>()((set, get) => ({
     set({
       messages: [],
       streamingText: "",
-      streamingEmotion: null,
-      currentEmotion: "normal",
+      streamingTachie: null,
+      streamingStyle: null,
+      currentTachie: "normal",
       isStreaming: false,
       currentRunId: null,
+      lastGeneratedAssistantMessageId: null,
     });
   },
 
@@ -154,7 +165,7 @@ export const useChat = create<ChatState>()((set, get) => ({
 
       return {
         messages: [...state.messages, message],
-        currentEmotion: "thinking" as const,
+        currentTachie: "thinking" as const,
       };
     });
   },
@@ -179,8 +190,9 @@ export const useChat = create<ChatState>()((set, get) => ({
         const parsed = streamingParser.feed(data.delta);
         set((state) => ({
           streamingText: state.streamingText + parsed.text,
-          streamingEmotion: parsed.emotion ?? state.streamingEmotion,
-          currentEmotion: parsed.emotion ?? state.currentEmotion,
+          streamingTachie: parsed.tachie ?? state.streamingTachie,
+          streamingStyle: parsed.style ?? state.streamingStyle,
+          currentTachie: parsed.tachie ?? state.currentTachie,
           isStreaming: true,
         }));
       }
@@ -199,8 +211,9 @@ export const useChat = create<ChatState>()((set, get) => ({
           const parsed = streamingParser.feed(content);
           set({
             streamingText: parsed.text,
-            streamingEmotion: parsed.emotion,
-            currentEmotion: parsed.emotion ?? get().currentEmotion,
+            streamingTachie: parsed.tachie,
+            streamingStyle: parsed.style,
+            currentTachie: parsed.tachie ?? get().currentTachie,
             isStreaming: true,
           });
         }
@@ -212,12 +225,13 @@ export const useChat = create<ChatState>()((set, get) => ({
       case "error":
       case "aborted":
         resetStreamingState();
-        set({
+        set((state) => ({
           streamingText: "",
-          streamingEmotion: null,
-          currentEmotion: "normal",
+          streamingTachie: null,
+          streamingStyle: null,
+          currentTachie: deriveTachieFromHistory(state.messages),
           isStreaming: false,
-        });
+        }));
         break;
     }
   },
@@ -226,32 +240,38 @@ export const useChat = create<ChatState>()((set, get) => ({
     const text = rawStreamBuffer;
     if (!text) {
       resetStreamingState();
-      set({
+      set((state) => ({
         streamingText: "",
-        streamingEmotion: null,
-        currentEmotion: "normal",
+        streamingTachie: null,
+        streamingStyle: null,
+        currentTachie: deriveTachieFromHistory(state.messages),
         isStreaming: false,
-      });
+      }));
       return;
     }
 
-    const parsed = parseEmotions(text);
-    const msg: UIMessage = {
-      id: crypto.randomUUID(),
-      role: "assistant",
-      content: parsed.text,
-      emotions: parsed.emotions,
-      timestamp: Date.now(),
-    };
-    const latestEmotion = getLatestEmotion(parsed.emotions) ?? "normal";
+    const parsed = parseMessageTags(text);
+    const nextMessage: UIMessage | null = parsed.text.trim()
+      ? {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: parsed.text,
+          tachie: parsed.tachie,
+          style: parsed.style,
+          timestamp: Date.now(),
+        }
+      : null;
+    const nextTachie = parsed.tachie ?? "normal";
     resetStreamingState();
     set((s) => ({
-      messages: [...s.messages, msg],
+      messages: nextMessage ? [...s.messages, nextMessage] : s.messages,
       streamingText: "",
-      streamingEmotion: null,
-      currentEmotion: latestEmotion,
+      streamingTachie: null,
+      streamingStyle: null,
+      currentTachie: nextTachie,
       isStreaming: false,
       currentRunId: null,
+      lastGeneratedAssistantMessageId: nextMessage?.id ?? null,
     }));
   },
 }));

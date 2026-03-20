@@ -8,6 +8,9 @@
   --surface: #ffffff;
   --surface-tint: #f5f8fc;
 
+  /* Border — 9nine reference */
+  --color-border: #eff4fd;
+
   /* Text */
   --text: #1a1a2e;
   --text-secondary: #5a6070;
@@ -22,6 +25,8 @@
   --shadow-card: 0 0 10px rgba(102, 113, 152, 0.1);
 
   /* Fonts */
+  --font-heading: "Cormorant Infant", serif;
+  --font-label: "Oswald", sans-serif;
   --font-ui: -apple-system, "Segoe UI", system-ui, sans-serif;
   --font-body: "Noto Sans SC", "Microsoft YaHei UI", "PingFang SC", sans-serif;
   --font-mono: "Fira Code", "Cascadia Code", "Consolas", monospace;
@@ -31,6 +36,9 @@
   --text-base: 14px;
   --text-md: 16px;
   --text-lg: 20px;
+
+  /* Transition */
+  --transition-normal: 0.4s ease;
 }
 
 /* Reset */
@@ -64,14 +72,16 @@ button {
   overflow: hidden;
 }
 
+html:has(body[data-window="pet"]),
 body[data-window="pet"],
 body[data-window="pet"] #root {
   background: transparent;
+  overflow: visible;
 }
 
 /* Keyframes */
 @keyframes fade-up {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -88,9 +98,9 @@ body[data-window="pet"] #root {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--text-tertiary);
+  background: var(--primary);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary);
+  background: var(--primary-hover);
 }

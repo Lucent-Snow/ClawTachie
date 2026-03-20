@@ -36,7 +36,7 @@ export function Composer() {
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Type a message..."
+        placeholder="输入消息..."
         disabled={!connected}
         rows={1}
       />
@@ -45,7 +45,7 @@ export function Composer() {
           className={styles.stopBtn}
           onClick={() => sessionKey && abort(sessionKey)}
         >
-          &#9632; Stop
+          &#9632; 停止
         </button>
       ) : (
         <button
@@ -53,7 +53,7 @@ export function Composer() {
           onClick={handleSend}
           disabled={!connected || !text.trim()}
         >
-          Send
+          发送
         </button>
       )}
     </div>

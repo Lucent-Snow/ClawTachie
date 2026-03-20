@@ -1,18 +1,18 @@
 import { create } from "zustand";
 import type { CharacterSpriteAsset } from "../lib/types";
-import { type EmotionName } from "../lib/emotions";
+import { type TachieName } from "../lib/emotions";
 import { loadCharacterSprites } from "../lib/tauri-gateway";
 
 interface CharacterState {
-  sprites: Partial<Record<EmotionName, string>>;
+  sprites: Partial<Record<TachieName, string>>;
   ready: boolean;
   loading: boolean;
   error: string | null;
   load: () => Promise<void>;
 }
 
-function mapSprites(assets: CharacterSpriteAsset[]): Partial<Record<EmotionName, string>> {
-  return assets.reduce<Partial<Record<EmotionName, string>>>((acc, asset) => {
+function mapSprites(assets: CharacterSpriteAsset[]): Partial<Record<TachieName, string>> {
+  return assets.reduce<Partial<Record<TachieName, string>>>((acc, asset) => {
     acc[asset.emotion] = asset.path;
     return acc;
   }, {});

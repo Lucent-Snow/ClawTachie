@@ -10,7 +10,10 @@ export function TitleBar({ onOpenSettings }: { onOpenSettings: () => void }) {
   return (
     <div className={styles.titlebar}>
       <div className={styles.drag} data-tauri-drag-region>
-        <span className={styles.appName}>ClawTachie</span>
+        <div className={styles.titleGroup}>
+          <span className={styles.titleEn}>CLAWTACHIE</span>
+          <span className={styles.titleJa}>桌面助手</span>
+        </div>
       </div>
       <div className={styles.right}>
         <div className={styles.status}>

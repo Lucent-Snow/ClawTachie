@@ -1,15 +1,15 @@
 import { useEffect } from "react";
-import { EMOTION_SET, type EmotionName } from "../lib/emotions";
+import { TACHIE_SET, type TachieName } from "../lib/emotions";
 import { useCharacter } from "../stores/character";
 import styles from "./CharacterSprite.module.css";
 
 interface CharacterSpriteProps {
-  emotion: EmotionName;
+  tachie: TachieName;
   alt?: string;
 }
 
 export function CharacterSprite({
-  emotion,
+  tachie,
   alt = "character sprite",
 }: CharacterSpriteProps) {
   const sprites = useCharacter((state) => state.sprites);
@@ -20,7 +20,7 @@ export function CharacterSprite({
     void load();
   }, [load]);
 
-  const activeEmotion = sprites[emotion] ? emotion : "normal";
+  const activeEmotion = sprites[tachie] ? tachie : "normal";
   const hasSprites = Object.keys(sprites).length > 0;
 
   if (ready && !hasSprites) {
@@ -29,7 +29,7 @@ export function CharacterSprite({
 
   return (
     <div className={styles.container}>
-      {EMOTION_SET.map((name) => {
+      {TACHIE_SET.map((name) => {
         const src = sprites[name];
         if (!src) {
           return null;

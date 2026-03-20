@@ -2,6 +2,7 @@
   position: relative;
   width: 100%;
   height: 100%;
+  overflow: visible;
 }
 
 .sprite {
@@ -10,6 +11,7 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
+  object-position: center bottom;
   opacity: 0;
   transition: opacity 0.4s ease-out;
   filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15));

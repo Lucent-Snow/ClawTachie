@@ -5,6 +5,7 @@ import {
   gatewayDisconnect,
   gatewaySessionsList,
 } from "../lib/tauri-gateway";
+import { useSettings } from "./settings";
 
 export type ConnectionStatus =
   | "disconnected"
@@ -39,7 +40,7 @@ export const useGateway = create<GatewayState>()((set, get) => ({
       await gatewayConnect(url, token);
       set({ status: "connected", error: null });
       // Auto-fetch sessions after connect
-      get().refreshSessions();
+      await get().refreshSessions();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       set({ status: "error", error: msg });
@@ -55,15 +56,26 @@ export const useGateway = create<GatewayState>()((set, get) => ({
     set({ status: "disconnected", error: null, sessions: [] });
   },
 
-  switchSession: (key) => set({ currentSessionKey: key }),
+  switchSession: (key) => {
+    set({ currentSessionKey: key });
+  },
 
   refreshSessions: async () => {
     try {
       const result = await gatewaySessionsList();
+      const defaultKey = useSettings.getState().gateway.sessionKey;
       const sorted = [...result.sessions].sort(
         (a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0),
       );
       set({ sessions: sorted });
+
+      // Auto-select: prefer saved default, fallback to first session
+      const { currentSessionKey } = get();
+      const firstSession = sorted[0];
+      if (!currentSessionKey && firstSession) {
+        const match = sorted.find((s) => s.key === defaultKey);
+        set({ currentSessionKey: match?.key ?? firstSession.key });
+      }
     } catch {
       // ignore — sessions list may not be available
     }

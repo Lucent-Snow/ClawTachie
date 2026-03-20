@@ -1,44 +1,117 @@
 .sidebar {
-  width: 200px;
-  background: var(--primary);
-  color: var(--text-inverse);
+  width: 220px;
+  background: var(--surface);
+  color: var(--text);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
   font-family: var(--font-ui);
   font-size: var(--text-sm);
+  border-right: 1px solid var(--color-border);
+}
+
+.sidebarHeader {
+  padding: 20px 20px 14px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.headerEn {
+  font-family: var(--font-heading);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+}
+
+.headerJa {
+  font-family: var(--font-body);
+  font-size: 10px;
+  color: var(--text-tertiary);
+  letter-spacing: 0.06em;
+  margin-top: 2px;
 }
 
 .item {
+  position: relative;
   display: block;
   width: 100%;
-  padding: 10px 14px;
+  padding: 12px 20px 12px 35px;
   background: transparent;
-  color: var(--text-inverse);
+  color: var(--text-secondary);
   text-align: left;
   border: none;
-  border-left: 2px solid transparent;
-  opacity: 0.7;
-  transition: opacity 0.15s, border-color 0.15s;
+  border-bottom: 1px solid var(--color-border);
+  transition: color var(--transition-normal), background var(--transition-normal);
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: var(--text-sm);
+}
+
+/* Diamond bullet */
+.item::before {
+  content: "";
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  background: var(--primary);
+  transform: translateY(-50%) rotate(45deg);
+  opacity: 0;
+  transition: opacity var(--transition-normal);
 }
 
 .item:hover {
-  opacity: 0.9;
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  background: var(--surface-tint);
+}
+
+.item:hover::before {
+  opacity: 0.4;
 }
 
 .item.active {
+  color: var(--primary);
+  background: var(--primary-faint);
+}
+
+.item.active::before {
   opacity: 1;
-  border-left-color: var(--text-inverse);
-  background: rgba(255, 255, 255, 0.1);
+}
+
+.itemDate {
+  display: block;
+  font-family: var(--font-label);
+  font-size: 10px;
+  color: var(--text-tertiary);
+  letter-spacing: 0.5px;
+  margin-top: 4px;
 }
 
 .empty {
-  padding: 14px;
-  opacity: 0.5;
+  padding: 20px;
+  color: var(--text-tertiary);
   font-size: var(--text-xs);
+}
+
+/* Agent group */
+.group {
+  display: flex;
+  flex-direction: column;
+}
+
+.groupHeader {
+  padding: 10px 20px 4px;
+  font-family: var(--font-label);
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.item.default {
+  font-weight: 600;
 }

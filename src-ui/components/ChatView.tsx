@@ -1,7 +1,7 @@
 import { useChat } from "../stores/chat";
 import { useGateway } from "../stores/gateway";
 import { useAutoScroll } from "../hooks/useAutoScroll";
-import { getEmotionLabel } from "../lib/emotions";
+import { getTachieLabel } from "../lib/emotions";
 import { MessageBubble } from "./MessageBubble";
 import { Composer } from "./Composer";
 import styles from "./ChatView.module.css";
@@ -9,7 +9,7 @@ import styles from "./ChatView.module.css";
 export function ChatView() {
   const messages = useChat((s) => s.messages);
   const streamingText = useChat((s) => s.streamingText);
-  const streamingEmotion = useChat((s) => s.streamingEmotion);
+  const streamingTachie = useChat((s) => s.streamingTachie);
   const isStreaming = useChat((s) => s.isStreaming);
   const currentKey = useGateway((s) => s.currentSessionKey);
   const sessions = useGateway((s) => s.sessions);
@@ -23,7 +23,7 @@ export function ChatView() {
   if (status !== "connected" && status !== "reconnecting") {
     return (
       <div className={styles.container}>
-        <div className={styles.empty}>Connect to Gateway to start chatting</div>
+        <div className={styles.empty}>请先连接网关</div>
       </div>
     );
   }
@@ -31,18 +31,17 @@ export function ChatView() {
   return (
     <div className={styles.container}>
       <div className={styles.infoBar}>
-        <span>{currentKey ?? "no session"}</span>
         {model && <span className={styles.modelTag}>{model}</span>}
       </div>
       <div className={styles.messages} ref={scrollRef}>
         {messages.map((m) => (
           <MessageBubble key={m.id} message={m} />
         ))}
-        {isStreaming && (streamingText || streamingEmotion) && (
+        {isStreaming && (streamingText || streamingTachie) && (
           <div className={styles.streaming}>
-            {streamingEmotion && (
+            {streamingTachie && (
               <div className={styles.emotionTag}>
-                &#9670; {getEmotionLabel(streamingEmotion)}
+                &#9670; {getTachieLabel(streamingTachie)}
               </div>
             )}
             <div className={styles.streamingText}>{streamingText}</div>

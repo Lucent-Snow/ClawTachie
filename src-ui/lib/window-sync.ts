@@ -2,10 +2,12 @@ import { emitTo, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { UIMessage } from "./types";
 import { hasTauriBackend } from "./tauri-gateway";
+import type { SettingsSnapshot } from "../stores/settings";
 
 const WINDOW_LABELS = ["main", "pet"] as const;
 const SESSION_EVENT = "clawtachie://sync-session";
 const USER_MESSAGE_EVENT = "clawtachie://sync-user-message";
+const SETTINGS_EVENT = "clawtachie://sync-settings";
 
 interface SessionSyncPayload {
   sessionKey: string;
@@ -14,6 +16,10 @@ interface SessionSyncPayload {
 interface UserMessageSyncPayload {
   sessionKey: string;
   message: UIMessage;
+}
+
+interface SettingsSyncPayload {
+  settings: SettingsSnapshot;
 }
 
 async function emitToOtherWindows<T>(event: string, payload: T) {
@@ -42,9 +48,14 @@ export async function broadcastUserMessage(sessionKey: string, message: UIMessag
   });
 }
 
+export async function broadcastSettingsChange(settings: SettingsSnapshot) {
+  await emitToOtherWindows<SettingsSyncPayload>(SETTINGS_EVENT, { settings });
+}
+
 export async function subscribeWindowSync(listeners: {
   onSessionChange?: (payload: SessionSyncPayload) => void;
   onUserMessage?: (payload: UserMessageSyncPayload) => void;
+  onSettingsChange?: (payload: SettingsSyncPayload) => void;
 }): Promise<UnlistenFn[]> {
   if (!hasTauriBackend()) {
     return [];
@@ -64,6 +75,14 @@ export async function subscribeWindowSync(listeners: {
     subscriptions.push(
       listen<UserMessageSyncPayload>(USER_MESSAGE_EVENT, (event) => {
         listeners.onUserMessage?.(event.payload);
+      }),
+    );
+  }
+
+  if (listeners.onSettingsChange) {
+    subscriptions.push(
+      listen<SettingsSyncPayload>(SETTINGS_EVENT, (event) => {
+        listeners.onSettingsChange?.(event.payload);
       }),
     );
   }

@@ -1,35 +1,46 @@
 .wrapper {
   display: flex;
-  gap: 8px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--primary-faint);
+  gap: 12px;
+  padding: 30px 80px;
+  border-top: 1px solid var(--color-border);
   background: var(--surface);
+  min-height: 120px;
+  align-items: stretch;
 }
 
 .input {
   flex: 1;
-  min-height: 38px;
-  max-height: 120px;
-  padding: 8px 12px;
-  border: 1px solid var(--primary-faint);
+  min-height: 60px;
+  max-height: 160px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
   background: var(--surface);
   color: var(--text);
   font-size: var(--text-base);
   resize: none;
   outline: none;
-  transition: border-color 0.15s;
+  transition: border-color var(--transition-normal), box-shadow var(--transition-normal);
 }
 .input:focus {
   border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-faint);
 }
 
 .sendBtn {
-  padding: 0 18px;
+  padding: 0 28px;
+  height: 48px;
+  align-self: flex-end;
   background: var(--primary);
   color: var(--text-inverse);
-  font-weight: 600;
+  font-family: var(--font-label);
   font-size: var(--text-sm);
-  transition: background 0.15s;
+  font-weight: 400;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  transition: background var(--transition-normal);
+}
+.sendBtn::after {
+  content: " →";
 }
 .sendBtn:hover:not(:disabled) {
   background: var(--primary-hover);
@@ -40,9 +51,13 @@
 }
 
 .stopBtn {
-  padding: 0 18px;
+  padding: 0 28px;
+  height: 48px;
+  align-self: flex-end;
   background: var(--error);
   color: var(--text-inverse);
-  font-weight: 600;
+  font-family: var(--font-label);
   font-size: var(--text-sm);
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
 }

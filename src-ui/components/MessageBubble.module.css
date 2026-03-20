@@ -1,10 +1,21 @@
 .bubble {
   position: relative;
   max-width: 80%;
-  padding: 10px 14px;
+  min-width: 0;
+  padding: 20px 30px;
   font-size: var(--text-base);
-  line-height: 1.6;
-  animation: fade-up 0.3s ease-out both;
+  line-height: 1.8;
+  word-break: break-word;
+  animation: fade-up 0.4s ease-out both;
+}
+
+.meta {
+  font-family: var(--font-label);
+  font-size: 10px;
+  color: var(--primary);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
 }
 
 .user {
@@ -13,6 +24,11 @@
   color: var(--text-inverse);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.user .meta {
+  text-align: right;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .assistant {

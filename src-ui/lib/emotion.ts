@@ -1,52 +1,79 @@
-import { type EmotionName, normalizeEmotionName } from "./emotions";
+import { type TachieName, normalizeTachieName } from "./emotions";
 
-const EMOTION_RE = /\[emotion:([^\]\s]+)\]/gi;
-const MARKER_PREFIX = "[emotion:";
-const MAX_MARKER_LENGTH = 32;
+const LEGACY_EMOTION_RE = /\[emotion:([^\]\s]+)\]/gi;
+const TACHIE_TAG_RE = /<tachie>([\s\S]*?)<\/tachie>/gi;
+const STYLE_TAG_RE = /<style>([\s\S]*?)<\/style>/gi;
+const OPENING_PREFIXES = ["<tachie>", "<style>", "[emotion:"] as const;
+const MAX_TAG_BUFFER = 2048;
 
 export interface ParsedMessage {
   text: string;
-  emotions: EmotionName[];
+  tachie: TachieName | null;
+  style: string | null;
 }
 
 export interface StreamingParseResult {
   text: string;
-  emotion: EmotionName | null;
+  tachie: TachieName | null;
+  style: string | null;
 }
 
-export interface StreamingEmotionParser {
+export interface StreamingTagParser {
   feed: (delta: string) => StreamingParseResult;
   flush: () => string;
   reset: () => void;
 }
 
-export function parseEmotions(raw: string): ParsedMessage {
-  const emotions: EmotionName[] = [];
+export function parseMessageTags(raw: string): ParsedMessage {
+  let tachie: TachieName | null = null;
+  let style: string | null = null;
+
   const text = raw
-    .replace(EMOTION_RE, (match, emotion: string) => {
-      const normalized = normalizeEmotionName(emotion);
+    .replace(TACHIE_TAG_RE, (match, value: string) => {
+      const normalized = normalizeTachieName(value);
       if (!normalized) {
         return match;
       }
-      emotions.push(normalized);
+      tachie = normalized;
+      return "";
+    })
+    .replace(STYLE_TAG_RE, (_match, value: string) => {
+      const nextStyle = value.trim();
+      if (nextStyle) {
+        style = nextStyle;
+      }
+      return "";
+    })
+    .replace(LEGACY_EMOTION_RE, (match, value: string) => {
+      const normalized = normalizeTachieName(value);
+      if (!normalized) {
+        return match;
+      }
+      tachie = normalized;
       return "";
     })
     .trim();
-  return { text, emotions };
+
+  return { text, tachie, style };
 }
 
-export function formatWithEmotion(parsed: ParsedMessage): string {
-  if (parsed.emotions.length === 0) return parsed.text;
-  const tag = parsed.emotions.map((e) => e).join(",");
-  return `[${tag}] ${parsed.text}`;
+export function parseEmotions(raw: string): { text: string; emotions: TachieName[] } {
+  const parsed = parseMessageTags(raw);
+  return {
+    text: parsed.text,
+    emotions: parsed.tachie ? [parsed.tachie] : [],
+  };
 }
 
 function splitTrailingPrefix(value: string): { head: string; tail: string } {
-  const maxLength = Math.min(value.length, MARKER_PREFIX.length - 1);
+  const maxLength = Math.min(
+    value.length,
+    Math.max(...OPENING_PREFIXES.map((prefix) => prefix.length - 1)),
+  );
 
   for (let length = maxLength; length > 0; length -= 1) {
     const tail = value.slice(-length);
-    if (MARKER_PREFIX.startsWith(tail)) {
+    if (OPENING_PREFIXES.some((prefix) => prefix.startsWith(tail))) {
       return {
         head: value.slice(0, value.length - length),
         tail,
@@ -57,7 +84,77 @@ function splitTrailingPrefix(value: string): { head: string; tail: string } {
   return { head: value, tail: "" };
 }
 
-export function createStreamingParser(): StreamingEmotionParser {
+function consumeKnownMarker(buffer: string): {
+  consumed: number;
+  text: string;
+  tachie: TachieName | null;
+  style: string | null;
+  wait: boolean;
+} {
+  if (buffer.startsWith("<tachie>")) {
+    const closeIndex = buffer.indexOf("</tachie>");
+    if (closeIndex === -1) {
+      if (buffer.length > MAX_TAG_BUFFER) {
+        return { consumed: 1, text: buffer.charAt(0), tachie: null, style: null, wait: false };
+      }
+      return { consumed: 0, text: "", tachie: null, style: null, wait: true };
+    }
+
+    const candidate = buffer.slice(0, closeIndex + "</tachie>".length);
+    const normalized = normalizeTachieName(buffer.slice("<tachie>".length, closeIndex));
+
+    return normalized
+      ? { consumed: candidate.length, text: "", tachie: normalized, style: null, wait: false }
+      : { consumed: candidate.length, text: candidate, tachie: null, style: null, wait: false };
+  }
+
+  if (buffer.startsWith("<style>")) {
+    const closeIndex = buffer.indexOf("</style>");
+    if (closeIndex === -1) {
+      if (buffer.length > MAX_TAG_BUFFER) {
+        return { consumed: 1, text: buffer.charAt(0), tachie: null, style: null, wait: false };
+      }
+      return { consumed: 0, text: "", tachie: null, style: null, wait: true };
+    }
+
+    const consumed = closeIndex + "</style>".length;
+    const style = buffer.slice("<style>".length, closeIndex).trim();
+
+    return {
+      consumed,
+      text: "",
+      tachie: null,
+      style: style || null,
+      wait: false,
+    };
+  }
+
+  if (buffer.startsWith("[emotion:")) {
+    const closeIndex = buffer.indexOf("]");
+    if (closeIndex === -1) {
+      if (buffer.length > MAX_TAG_BUFFER) {
+        return { consumed: 1, text: buffer.charAt(0), tachie: null, style: null, wait: false };
+      }
+      return { consumed: 0, text: "", tachie: null, style: null, wait: true };
+    }
+
+    const candidate = buffer.slice(0, closeIndex + 1);
+    const match = /^\[emotion:([^\]\s]+)\]$/i.exec(candidate);
+    const normalized = match ? normalizeTachieName(match[1]) : null;
+
+    return normalized
+      ? { consumed: candidate.length, text: "", tachie: normalized, style: null, wait: false }
+      : { consumed: candidate.length, text: candidate, tachie: null, style: null, wait: false };
+  }
+
+  if (OPENING_PREFIXES.some((prefix) => prefix.startsWith(buffer))) {
+    return { consumed: 0, text: "", tachie: null, style: null, wait: true };
+  }
+
+  return { consumed: 1, text: buffer.charAt(0), tachie: null, style: null, wait: false };
+}
+
+export function createStreamingParser(): StreamingTagParser {
   let buffer = "";
 
   return {
@@ -65,10 +162,15 @@ export function createStreamingParser(): StreamingEmotionParser {
       buffer += delta;
 
       let text = "";
-      let emotion: EmotionName | null = null;
+      let tachie: TachieName | null = null;
+      let style: string | null = null;
 
       while (buffer.length > 0) {
-        const markerIndex = buffer.indexOf(MARKER_PREFIX);
+        const markerIndexCandidates = [buffer.indexOf("<"), buffer.indexOf("[emotion:")]
+          .filter((index) => index >= 0);
+        const markerIndex = markerIndexCandidates.length > 0
+          ? Math.min(...markerIndexCandidates)
+          : -1;
 
         if (markerIndex === -1) {
           const { head, tail } = splitTrailingPrefix(buffer);
@@ -82,30 +184,18 @@ export function createStreamingParser(): StreamingEmotionParser {
           buffer = buffer.slice(markerIndex);
         }
 
-        const closeIndex = buffer.indexOf("]");
-        if (closeIndex === -1) {
-          if (buffer.length > MAX_MARKER_LENGTH) {
-            text += buffer[0];
-            buffer = buffer.slice(1);
-            continue;
-          }
+        const consumed = consumeKnownMarker(buffer);
+        if (consumed.wait) {
           break;
         }
 
-        const candidate = buffer.slice(0, closeIndex + 1);
-        const match = /^\[emotion:([^\]\s]+)\]$/i.exec(candidate);
-        const normalized = match ? normalizeEmotionName(match[1]) : null;
-
-        if (!normalized) {
-          text += candidate;
-        } else {
-          emotion = normalized;
-        }
-
-        buffer = buffer.slice(closeIndex + 1);
+        text += consumed.text;
+        tachie = consumed.tachie ?? tachie;
+        style = consumed.style ?? style;
+        buffer = buffer.slice(consumed.consumed);
       }
 
-      return { text, emotion };
+      return { text, tachie, style };
     },
     flush() {
       const rest = buffer;

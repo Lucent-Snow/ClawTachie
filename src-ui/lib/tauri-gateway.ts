@@ -4,6 +4,8 @@ import type {
   CharacterSpriteAsset,
   HelloOk,
   SessionsListResult,
+  TtsSynthesizeRequest,
+  TtsSynthesizeResponse,
 } from "./types";
 
 export interface GatewayDisconnectedEvent {
@@ -60,12 +62,26 @@ export async function loadCharacterSprites(): Promise<CharacterSpriteAsset[]> {
   }));
 }
 
+export async function ttsSynthesize(
+  request: TtsSynthesizeRequest,
+): Promise<TtsSynthesizeResponse> {
+  const result = await invoke<{ path: string }>("tts_synthesize", { request });
+  return {
+    path: result.path,
+    assetUrl: convertFileSrc(result.path),
+  };
+}
+
 export async function showMainWindow(): Promise<void> {
   await invoke("show_main_window");
 }
 
 export async function startCurrentWindowDragging(): Promise<void> {
   await invoke("start_current_window_dragging");
+}
+
+export async function exitApp(): Promise<void> {
+  await invoke("exit_app");
 }
 
 export async function subscribeGatewayEvents(listeners: {

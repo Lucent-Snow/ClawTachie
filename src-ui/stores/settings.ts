@@ -1,21 +1,193 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { TtsProvider } from "../lib/types";
 
-interface SettingsState {
-  gatewayUrl: string;
+export interface GatewaySettings {
+  url: string;
   token: string;
   sessionKey: string;
-  update: (partial: Partial<Omit<SettingsState, "update">>) => void;
+  autoConnect: boolean;
+}
+
+export interface TtsSettings {
+  enabled: boolean;
+  provider: TtsProvider;
+  autoPlay: boolean;
+  mimoApiKey: string;
+  mimoVoice: string;
+  mimoModel: string;
+  mimoScriptPath: string;
+  mimoUserContext: string;
+}
+
+export interface PetSettings {
+  spriteScale: number;
+}
+
+export interface SettingsSnapshot {
+  gateway: GatewaySettings;
+  tts: TtsSettings;
+  pet: PetSettings;
+}
+
+type SettingsSnapshotPatch = {
+  gateway?: Partial<GatewaySettings>;
+  tts?: Partial<TtsSettings>;
+  pet?: Partial<PetSettings>;
+};
+
+interface SettingsState extends SettingsSnapshot {
+  updateGateway: (partial: Partial<GatewaySettings>) => void;
+  updateTts: (partial: Partial<TtsSettings>) => void;
+  updatePet: (partial: Partial<PetSettings>) => void;
+  applySnapshot: (snapshot: SettingsSnapshotPatch) => void;
+}
+
+export const DEFAULT_SETTINGS: SettingsSnapshot = {
+  gateway: {
+    url: "ws://127.0.0.1:18789",
+    token: "",
+    sessionKey: "agent:clawtachie:main",
+    autoConnect: true,
+  },
+  tts: {
+    enabled: false,
+    provider: "none",
+    autoPlay: true,
+    mimoApiKey: "",
+    mimoVoice: "default_zh",
+    mimoModel: "mimo-v2-tts",
+    mimoScriptPath: "E:\\Desktop\\code\\tts\\mimo-tts\\generate_mimo_tts.py",
+    mimoUserContext: "",
+  },
+  pet: {
+    spriteScale: 1,
+  },
+};
+
+function normalizeSessionKey(value: string | undefined): string {
+  if (!value || value === "agent:main:clawtachie") {
+    return DEFAULT_SETTINGS.gateway.sessionKey;
+  }
+
+  return value;
+}
+
+function mergeSnapshot(snapshot: SettingsSnapshotPatch | undefined): SettingsSnapshot {
+  const gatewayInput: Partial<GatewaySettings> = snapshot?.gateway ?? {};
+  const ttsInput: Partial<TtsSettings> = snapshot?.tts ?? {};
+  const petInput: Partial<PetSettings> = snapshot?.pet ?? {};
+
+  return {
+    gateway: {
+      ...DEFAULT_SETTINGS.gateway,
+      ...gatewayInput,
+      sessionKey: normalizeSessionKey(gatewayInput.sessionKey),
+    },
+    tts: {
+      ...DEFAULT_SETTINGS.tts,
+      ...ttsInput,
+    },
+    pet: {
+      ...DEFAULT_SETTINGS.pet,
+      ...petInput,
+      spriteScale:
+        typeof petInput.spriteScale === "number" && Number.isFinite(petInput.spriteScale)
+          ? petInput.spriteScale
+          : DEFAULT_SETTINGS.pet.spriteScale,
+    },
+  };
+}
+
+function normalizePersistedState(value: unknown): SettingsSnapshot {
+  if (!value || typeof value !== "object") {
+    return DEFAULT_SETTINGS;
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  if ("gateway" in candidate || "tts" in candidate) {
+    const gatewayInput = (candidate.gateway as Partial<GatewaySettings> | undefined) ?? {};
+    const ttsInput = (candidate.tts as Partial<TtsSettings> | undefined) ?? {};
+    const petInput = (candidate.pet as Partial<PetSettings> | undefined) ?? {};
+
+    return mergeSnapshot({
+      gateway: gatewayInput,
+      tts: ttsInput,
+      pet: petInput,
+    });
+  }
+
+  const legacyGateway: Partial<GatewaySettings> = {};
+  if (typeof candidate.gatewayUrl === "string") {
+    legacyGateway.url = candidate.gatewayUrl;
+  }
+  if (typeof candidate.token === "string") {
+    legacyGateway.token = candidate.token;
+  }
+  if (typeof candidate.sessionKey === "string") {
+    legacyGateway.sessionKey = candidate.sessionKey;
+  }
+
+  return mergeSnapshot({
+    gateway: legacyGateway,
+  });
 }
 
 export const useSettings = create<SettingsState>()(
   persist(
     (set) => ({
-      gatewayUrl: "ws://127.0.0.1:18789",
-      token: "",
-      sessionKey: "agent:clawtachie:main",
-      update: (partial) => set(partial),
+      ...DEFAULT_SETTINGS,
+      updateGateway: (partial) =>
+        set((state) => ({
+          gateway: {
+            ...state.gateway,
+            ...partial,
+            sessionKey: normalizeSessionKey(partial.sessionKey ?? state.gateway.sessionKey),
+          },
+        })),
+      updateTts: (partial) =>
+        set((state) => ({
+          tts: {
+            ...state.tts,
+            ...partial,
+          },
+        })),
+      updatePet: (partial) =>
+        set((state) => ({
+          pet: {
+            ...state.pet,
+            ...partial,
+          },
+        })),
+      applySnapshot: (snapshot) =>
+        set((state) => ({
+          gateway: {
+            ...state.gateway,
+            ...(snapshot.gateway ?? {}),
+            sessionKey: normalizeSessionKey(
+              snapshot.gateway?.sessionKey ?? state.gateway.sessionKey,
+            ),
+          },
+          tts: {
+            ...state.tts,
+            ...(snapshot.tts ?? {}),
+          },
+          pet: {
+            ...state.pet,
+            ...(snapshot.pet ?? {}),
+          },
+        })),
     }),
-    { name: "clawtachie-settings" },
+    {
+      name: "clawtachie-settings",
+      version: 3,
+      partialize: (state) => ({
+        gateway: state.gateway,
+        tts: state.tts,
+        pet: state.pet,
+      }),
+      migrate: (persistedState) => normalizePersistedState(persistedState),
+    },
   ),
 );

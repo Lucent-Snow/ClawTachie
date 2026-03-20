@@ -4,9 +4,8 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding: 12px;
+  padding: 0 12px 12px;
   background: transparent;
-  overflow: hidden;
 }
 
 .toolButton,
@@ -18,27 +17,51 @@
   backdrop-filter: blur(10px);
 }
 
-.bubble {
-  align-self: stretch;
-  margin: 0 12px 12px;
-  padding: 12px 14px;
+/* Sprite area: fixed height matching sprite, not flex */
+.spriteArea {
+  position: relative;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+/* Sprite frame: natural size, anchored at bottom center */
+.spriteScaleFrame {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  transform-origin: center bottom;
+  cursor: grab;
+  user-select: none;
+  overflow: visible;
+}
+
+/* Dialog panel: always rendered, fixed height, normal flow */
+.dialogPanel {
+  flex-shrink: 0;
+  height: 120px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 14px;
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(12px);
   border-left: 2px solid var(--primary);
   box-shadow: var(--shadow-card);
-  animation: fade-up 0.4s ease-out both;
-  z-index: 2;
 }
 
-.fadeLater {
-  transition: opacity 0.4s ease-out;
+.dialogBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .emotionTag {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   padding: 2px 6px;
   background: var(--primary-faint);
   color: var(--primary);
@@ -53,39 +76,16 @@
   word-break: break-word;
 }
 
-.cursor {
-  display: inline-block;
-  margin-left: 2px;
-  animation: cursor-blink 1s infinite;
-}
-
-.spriteArea {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  margin: 0 8px;
-  cursor: grab;
-  user-select: none;
-}
-
+/* Input bar: in flex flow below dialog, toggles on double-click */
 .inputBar {
+  flex-shrink: 0;
   display: flex;
   gap: 8px;
   align-items: flex-end;
-  padding: 10px;
-  margin-top: 8px;
-  background: rgba(255, 255, 255, 0.86);
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(12px);
-  opacity: 0;
-  transform: translateY(8px);
-  transition: opacity 0.4s ease-out, transform 0.4s ease-out;
-  z-index: 5;
-}
-
-.shell:hover .inputBar,
-.shell:focus-within .inputBar {
-  opacity: 1;
-  transform: translateY(0);
+  border-top: 1px solid rgba(0, 71, 137, 0.12);
 }
 
 .input {
@@ -119,8 +119,6 @@
 
 .contextMenu {
   position: absolute;
-  right: 12px;
-  bottom: 74px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -129,4 +127,9 @@
   backdrop-filter: blur(12px);
   box-shadow: var(--shadow-card);
   z-index: 4;
+  min-width: 160px;
+}
+
+.contextItem {
+  text-align: left;
 }
