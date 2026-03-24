@@ -22,7 +22,7 @@
         "resizable": true,
         "fullscreen": false,
         "decorations": false,
-        "visible": false
+        "visible": true
       },
       {
         "label": "pet",
@@ -34,6 +34,7 @@
         "resizable": true,
         "fullscreen": false,
         "decorations": false,
+        "visible": false,
         "transparent": true,
         "alwaysOnTop": true,
         "shadow": false
@@ -54,7 +55,23 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "createUpdaterArtifacts": true,
+    "targets": [
+      "nsis"
+    ],
+    "shortDescription": "ClawTachie desktop companion",
+    "longDescription": "A Tauri-based desktop chat companion with optional pet window, session management, and in-app updates.",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": [
+          "SimpChinese",
+          "English"
+        ],
+        "displayLanguageSelector": false,
+        "startMenuFolder": "ClawTachie"
+      }
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -62,5 +79,18 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "dialog": false,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDUyNkZGMEJFMkZFNjFCREUKUldUZUcrWXZ2dkJ2VXRZcU5kYWpvWTBjeFhDRGdER3hXVkJPS2tkNnA4VUNtL2FLNnhDSVQyWlYK",
+      "endpoints": [
+        "https://github.com/Lucent-Snow/ClawTachie/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

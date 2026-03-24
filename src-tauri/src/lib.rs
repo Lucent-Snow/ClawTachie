@@ -26,15 +26,32 @@ fn exit_app(app: AppHandle) {
     app.exit(0);
 }
 
+#[tauri::command]
+fn set_pet_window_visible(app: AppHandle, visible: bool) -> Result<(), String> {
+    let window = app
+        .get_webview_window("pet")
+        .ok_or_else(|| "pet window not found".to_string())?;
+
+    if visible {
+        window.show().map_err(|err| err.to_string())?;
+    } else {
+        window.hide().map_err(|err| err.to_string())?;
+    }
+
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default()
+        .plugin(tauri_plugin_process::init())
         .manage(gateway::GatewayState::default())
         .invoke_handler(tauri::generate_handler![
             characters::load_character_sprites,
             show_main_window,
             start_current_window_dragging,
             exit_app,
+            set_pet_window_visible,
             tts::tts_synthesize,
             gateway::gateway_connect,
             gateway::gateway_disconnect,
@@ -51,6 +68,9 @@ pub fn run() {
 
     builder
         .setup(|app| {
+            #[cfg(desktop)]
+            app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
+
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()

@@ -1,9 +1,10 @@
 import { useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useSettings } from "./stores/settings";
+import { useUpdater } from "./stores/updater";
 import { useGateway } from "./stores/gateway";
 import { useChat } from "./stores/chat";
-import { subscribeGatewayEvents } from "./lib/tauri-gateway";
+import { hasTauriBackend, setPetWindowVisible, subscribeGatewayEvents } from "./lib/tauri-gateway";
 import { subscribeWindowSync } from "./lib/window-sync";
 import { MainWindow } from "./windows/MainWindow";
 import { PetWindow } from "./windows/PetWindow";
@@ -22,6 +23,10 @@ export function App() {
   } = useChat();
   const currentSessionKey = useGateway((s) => s.currentSessionKey);
   const isPetWindow = currentWindow.label === "pet";
+  const petEnabled = useSettings((s) => s.pet.enabled);
+  const autoCheckUpdates = useSettings((s) => s.updates.autoCheck);
+  const initializeUpdater = useUpdater((s) => s.initialize);
+  const checkForUpdates = useUpdater((s) => s.checkForUpdates);
 
   // Set initial session from settings
   useEffect(() => {
@@ -121,6 +126,30 @@ export function App() {
   useEffect(() => {
     document.body.dataset.window = isPetWindow ? "pet" : "main";
   }, [isPetWindow]);
+
+  useEffect(() => {
+    if (!hasTauriBackend() || isPetWindow) {
+      return;
+    }
+
+    void setPetWindowVisible(petEnabled);
+  }, [isPetWindow, petEnabled]);
+
+  useEffect(() => {
+    if (!hasTauriBackend() || isPetWindow) {
+      return;
+    }
+
+    void initializeUpdater();
+
+    if (autoCheckUpdates) {
+      void checkForUpdates({ silent: true });
+    }
+  }, [autoCheckUpdates, checkForUpdates, initializeUpdater, isPetWindow]);
+
+  if (isPetWindow && !petEnabled) {
+    return null;
+  }
 
   return isPetWindow ? <PetWindow /> : <MainWindow />;
 }

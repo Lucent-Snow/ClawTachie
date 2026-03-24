@@ -84,6 +84,10 @@ export async function exitApp(): Promise<void> {
   await invoke("exit_app");
 }
 
+export async function setPetWindowVisible(visible: boolean): Promise<void> {
+  await invoke("set_pet_window_visible", { visible });
+}
+
 export async function subscribeGatewayEvents(listeners: {
   onChatEvent: (payload: Record<string, unknown>) => void;
   onRunEnd: () => void;
