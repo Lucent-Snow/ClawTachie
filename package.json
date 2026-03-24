@@ -8,6 +8,7 @@
     "cli:dev": "tsx src/index.ts",
     "ui:dev": "vite --host 127.0.0.1 --port 1420",
     "ui:build": "vite build",
+    "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json --noEmit"
