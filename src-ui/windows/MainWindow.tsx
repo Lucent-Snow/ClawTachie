@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { TitleBar } from "../components/TitleBar";
+import { SessionTabs } from "../components/SessionTabs";
 import { SessionList } from "../components/SessionList";
 import { ChatView } from "../components/ChatView";
 import { SettingsModal } from "../components/SettingsModal";
@@ -13,7 +14,10 @@ export function MainWindow() {
       <TitleBar onOpenSettings={() => setShowSettings(true)} />
       <div className={styles.content}>
         <SessionList />
-        <ChatView />
+        <div className={styles.mainPane}>
+          <SessionTabs />
+          <ChatView />
+        </div>
       </div>
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </div>

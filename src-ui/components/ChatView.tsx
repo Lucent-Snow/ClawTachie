@@ -1,4 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  gatewayModelsList,
+  type GatewayModelOption,
+} from "../lib/tauri-gateway";
 import { useChat } from "../stores/chat";
 import { useGateway } from "../stores/gateway";
 import { useSettings } from "../stores/settings";
@@ -19,6 +23,8 @@ export function ChatView() {
   const updateSessionModel = useGateway((s) => s.updateSessionModel);
   const [modelDraft, setModelDraft] = useState("");
   const [isApplyingModel, setIsApplyingModel] = useState(false);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [catalogModels, setCatalogModels] = useState<GatewayModelOption[]>([]);
   const [modelError, setModelError] = useState<string | null>(null);
   const modelRequestIdRef = useRef(0);
 
@@ -28,16 +34,73 @@ export function ChatView() {
   ]);
 
   const session = sessions.find((s) => s.key === currentKey);
-  const availableModels = useMemo(
-    () => Array.from(new Set(sessions.map((item) => item.model?.trim()).filter(Boolean))),
-    [sessions],
-  );
+  const availableModels = useMemo(() => {
+    const options = new Map<string, { value: string; label: string }>();
+
+    for (const option of catalogModels) {
+      const value = option.id.trim();
+      if (!value || options.has(value)) {
+        continue;
+      }
+
+      options.set(value, {
+        value,
+        label: option.label || value,
+      });
+    }
+
+    return Array.from(options.values());
+  }, [catalogModels]);
+
+  const selectedKnownModel = useMemo(() => {
+    const normalized = modelDraft.trim();
+    return availableModels.some((option) => option.value === normalized) ? normalized : "";
+  }, [availableModels, modelDraft]);
+
+  const currentModelMissing =
+    Boolean(session?.model) &&
+    !availableModels.some((option) => option.value === session?.model);
 
   useEffect(() => {
     setModelDraft(session?.model ?? "");
     setModelError(null);
     setIsApplyingModel(false);
   }, [session?.key, session?.model]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadModelCatalog = async () => {
+      if (status !== "connected" && status !== "reconnecting") {
+        setCatalogModels([]);
+        setIsLoadingModels(false);
+        return;
+      }
+
+      setIsLoadingModels(true);
+
+      try {
+        const models = await gatewayModelsList();
+        if (!cancelled) {
+          setCatalogModels(models);
+        }
+      } catch {
+        if (!cancelled) {
+          setCatalogModels([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingModels(false);
+        }
+      }
+    };
+
+    void loadModelCatalog();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [status]);
 
   const connected = status === "connected";
   const modelSwitchDisabled = !currentKey || !connected || isStreaming || isApplyingModel;
@@ -95,35 +158,47 @@ export function ChatView() {
     <div className={styles.container}>
       <div className={styles.infoBar}>
         <span className={styles.infoLabel}>模型</span>
-        <input
-          className={styles.modelInput}
-          list="chat-model-options"
-          value={modelDraft}
-          onChange={(event) => setModelDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              void handleModelApply();
-            }
+        <select
+          className={styles.modelSelect}
+          value={selectedKnownModel}
+          onChange={(event) => {
+            setModelDraft(event.target.value);
+            setModelError(null);
           }}
-          placeholder="输入模型名"
-          disabled={modelSwitchDisabled}
-        />
-        <datalist id="chat-model-options">
-          {availableModels.map((model) => (
-            <option key={model} value={model} />
+          disabled={modelSwitchDisabled || availableModels.length === 0}
+        >
+          <option value="">
+            {isLoadingModels
+              ? "读取模型列表中..."
+              : availableModels.length > 0
+                ? "选择要切换的模型"
+                : "未发现模型列表"}
+          </option>
+          {availableModels.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
           ))}
-        </datalist>
+        </select>
         <button
           type="button"
           className={styles.modelApplyBtn}
           onClick={() => void handleModelApply()}
-          disabled={modelSwitchDisabled}
+          disabled={modelSwitchDisabled || !selectedKnownModel}
         >
           {isApplyingModel ? "切换中..." : "切换"}
         </button>
-        {session?.modelProvider && (
-          <span className={styles.modelMeta}>{session.modelProvider}</span>
+        <span className={styles.modelHint}>
+          {isLoadingModels
+            ? "正在同步模型候选..."
+            : availableModels.length > 0
+              ? `候选 ${availableModels.length} 个`
+              : "网关没有返回可选模型列表"}
+        </span>
+        {currentModelMissing && (
+          <span className={styles.modelHint}>
+            当前模型 {session?.model} 不在可选列表中
+          </span>
         )}
         {modelError && <span className={styles.modelError}>{modelError}</span>}
       </div>

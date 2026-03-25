@@ -25,6 +25,7 @@ interface GatewayState {
   error: string | null;
   sessions: SessionRow[];
   currentSessionKey: string | null;
+  openSessionKeys: string[];
   composerFocusToken: number;
   connect: (url: string, token: string) => Promise<void>;
   disconnect: () => Promise<void>;
@@ -34,6 +35,7 @@ interface GatewayState {
   renameSession: (key: string, label: string) => Promise<void>;
   updateSessionModel: (key: string, model: string) => Promise<void>;
   switchSession: (key: string) => void;
+  closeSessionTab: (key: string) => void;
   refreshSessions: () => Promise<void>;
   requestComposerFocus: () => void;
   setStatus: (status: ConnectionStatus, error?: string | null) => void;
@@ -48,6 +50,15 @@ async function persistSessionKey(key: string) {
     pet: next.pet,
     updates: next.updates,
   });
+}
+
+async function reconnectGatewayIfNeeded(error: unknown, reconnect: () => Promise<void>) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (!/gateway not connected/i.test(message)) {
+    throw error;
+  }
+
+  await reconnect();
 }
 
 function mergeSessionMetadata(next: SessionRow, previous?: SessionRow): SessionRow {
@@ -66,6 +77,7 @@ export const useGateway = create<GatewayState>()((set, get) => ({
   error: null,
   sessions: [],
   currentSessionKey: null,
+  openSessionKeys: [],
   composerFocusToken: 0,
 
   setStatus: (status, error = null) => set({ status, error }),
@@ -77,9 +89,8 @@ export const useGateway = create<GatewayState>()((set, get) => ({
     set({ status: "connecting", error: null });
     try {
       await gatewayConnect(url, token);
-      set({ status: "connected", error: null });
-      // Auto-fetch sessions after connect
       await get().refreshSessions();
+      set({ status: "connected", error: null });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       set({ status: "error", error: msg });
@@ -92,7 +103,7 @@ export const useGateway = create<GatewayState>()((set, get) => ({
     } catch {
       // ignore
     }
-    set({ status: "disconnected", error: null, sessions: [] });
+    set({ status: "disconnected", error: null, sessions: [], openSessionKeys: [] });
   },
 
   createSession: async () => {
@@ -100,6 +111,9 @@ export const useGateway = create<GatewayState>()((set, get) => ({
     await gatewaySessionsReset(key, "new");
     set((state) => ({
       currentSessionKey: key,
+      openSessionKeys: state.openSessionKeys.includes(key)
+        ? state.openSessionKeys
+        : [...state.openSessionKeys, key],
       composerFocusToken: state.composerFocusToken + 1,
     }));
     useChat.getState().clearMessages();
@@ -143,6 +157,7 @@ export const useGateway = create<GatewayState>()((set, get) => ({
     set({
       sessions,
       currentSessionKey: nextKey,
+      openSessionKeys: prev.openSessionKeys.filter((sessionKey) => sessionKey !== key),
     });
     if (prev.currentSessionKey === key) {
       useChat.getState().clearMessages();
@@ -178,7 +193,23 @@ export const useGateway = create<GatewayState>()((set, get) => ({
     const patch: GatewaySessionPatch = {
       model: normalized || null,
     };
-    await gatewaySessionsPatch(key, patch);
+    try {
+      await gatewaySessionsPatch(key, patch);
+    } catch (error) {
+      await reconnectGatewayIfNeeded(error, async () => {
+        const gateway = useSettings.getState().gateway;
+        if (!gateway.url.trim() || !gateway.token.trim()) {
+          throw error;
+        }
+
+        await get().connect(gateway.url.trim(), gateway.token);
+        if (get().status !== "connected") {
+          throw error;
+        }
+
+        await gatewaySessionsPatch(key, patch);
+      });
+    }
     set((state) => ({
       sessions: state.sessions.map((session) =>
         session.key === key
@@ -194,7 +225,32 @@ export const useGateway = create<GatewayState>()((set, get) => ({
   },
 
   switchSession: (key) => {
-    set({ currentSessionKey: key });
+    set((state) => ({
+      currentSessionKey: key,
+      openSessionKeys: state.openSessionKeys.includes(key)
+        ? state.openSessionKeys
+        : [...state.openSessionKeys, key],
+    }));
+  },
+
+  closeSessionTab: (key) => {
+    set((state) => {
+      const index = state.openSessionKeys.indexOf(key);
+      if (index === -1) {
+        return state;
+      }
+
+      const openSessionKeys = state.openSessionKeys.filter((sessionKey) => sessionKey !== key);
+      const nextCurrentSessionKey =
+        state.currentSessionKey !== key
+          ? state.currentSessionKey
+          : openSessionKeys[index] ?? openSessionKeys[index - 1] ?? null;
+
+      return {
+        openSessionKeys,
+        currentSessionKey: nextCurrentSessionKey,
+      };
+    });
   },
 
   refreshSessions: async () => {
@@ -213,6 +269,10 @@ export const useGateway = create<GatewayState>()((set, get) => ({
         fallbackCurrent && !sorted.some((session) => session.key === fallbackCurrent.key)
           ? [fallbackCurrent, ...sorted]
           : sorted;
+      const previousOpenSessionKeys = get().openSessionKeys;
+      const openSessionKeys = previousOpenSessionKeys.filter((key) =>
+        merged.some((session) => session.key === key),
+      );
       const resolvedCurrent =
         currentSessionKey && merged.some((session) => session.key === currentSessionKey)
           ? currentSessionKey
@@ -225,10 +285,21 @@ export const useGateway = create<GatewayState>()((set, get) => ({
         set({
           sessions: merged,
           currentSessionKey: match?.key ?? firstSession.key,
+          openSessionKeys:
+            openSessionKeys.length > 0
+              ? openSessionKeys
+              : [match?.key ?? firstSession.key],
         });
         return;
       }
-      set({ sessions: merged, currentSessionKey: resolvedCurrent });
+      set({
+        sessions: merged,
+        currentSessionKey: resolvedCurrent,
+        openSessionKeys:
+          openSessionKeys.length > 0 || !resolvedCurrent
+            ? openSessionKeys
+            : [resolvedCurrent],
+      });
     } catch {
       // ignore — sessions list may not be available
     }
