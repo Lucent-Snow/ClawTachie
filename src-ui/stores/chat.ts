@@ -8,6 +8,7 @@ import {
   gatewayHistory,
   gatewayChatAbort,
 } from "../lib/tauri-gateway";
+import { useSettings } from "./settings";
 import { useTts } from "./tts";
 import { useGateway } from "./gateway";
 
@@ -233,6 +234,24 @@ function dedupeMessages(messages: UIMessage[]): UIMessage[] {
 
 let rawStreamBuffer = "";
 const streamingParser = createStreamingParser();
+let historyLoadRequestId = 0;
+
+async function reconnectForHistoryIfNeeded(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (!/gateway not connected/i.test(message)) {
+    throw error;
+  }
+
+  const gateway = useSettings.getState().gateway;
+  if (!gateway.url.trim() || !gateway.token.trim()) {
+    throw error;
+  }
+
+  await useGateway.getState().connect(gateway.url.trim(), gateway.token);
+  if (useGateway.getState().status !== "connected") {
+    throw error;
+  }
+}
 
 function deriveTachieFromHistory(messages: UIMessage[]): TachieName {
   const latestAssistant = [...messages]
@@ -322,21 +341,36 @@ export const useChat = create<ChatState>()((set, get) => ({
   },
 
   loadHistory: async (sessionKey) => {
+    const requestId = historyLoadRequestId + 1;
+    historyLoadRequestId = requestId;
     let raw: unknown[] = [];
     try {
       raw = await gatewayHistory(sessionKey, 50);
-    } catch {
-      set({
-        messages: [],
-        currentTachie: "normal",
-        streamingTachie: null,
-        streamingStyle: null,
-        streamingText: "",
-        isStreaming: false,
-        lastGeneratedAssistantMessageId: null,
-      });
+    } catch (error) {
+      try {
+        await reconnectForHistoryIfNeeded(error);
+        raw = await gatewayHistory(sessionKey, 50);
+      } catch {
+        if (historyLoadRequestId !== requestId) {
+          return;
+        }
+        set({
+          messages: [],
+          currentTachie: "normal",
+          streamingTachie: null,
+          streamingStyle: null,
+          streamingText: "",
+          isStreaming: false,
+          lastGeneratedAssistantMessageId: null,
+        });
+        return;
+      }
+    }
+
+    if (historyLoadRequestId !== requestId) {
       return;
     }
+
     const messages = dedupeMessages(
       raw
         .map((item: unknown) => normalizeHistoryMessage(item))
@@ -354,6 +388,7 @@ export const useChat = create<ChatState>()((set, get) => ({
   },
 
   clearMessages: () => {
+    historyLoadRequestId += 1;
     resetStreamingState();
     set({
       messages: [],

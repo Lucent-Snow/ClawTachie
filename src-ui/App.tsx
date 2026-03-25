@@ -35,16 +35,6 @@ export function App() {
     }
   }, [currentSessionKey, settings.gateway.sessionKey, switchSession]);
 
-  // Auto-connect on startup
-  useEffect(() => {
-    const { url, token, autoConnect } = settings.gateway;
-    if (autoConnect && token && status === "disconnected") {
-      void connect(url, token);
-    }
-    // Only run once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // Subscribe to Tauri gateway events
   useEffect(() => {
     let cancelled = false;
@@ -68,8 +58,9 @@ export function App() {
         setStatus("reconnecting");
       },
       onConnected: () => {
-        setStatus("connected");
-        refreshSessions();
+        void refreshSessions().finally(() => {
+          setStatus("connected");
+        });
       },
     }).then((fns) => {
       if (cancelled) { fns.forEach((f) => f()); return; }
@@ -114,6 +105,16 @@ export function App() {
       unlisteners.forEach((fn) => fn());
     };
   }, [appendExternalUserMessage]);
+
+  // Auto-connect on startup after listeners are ready
+  useEffect(() => {
+    const { url, token, autoConnect } = settings.gateway;
+    if (autoConnect && token && status === "disconnected") {
+      void connect(url, token);
+    }
+    // Only run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Load history when session changes
   useEffect(() => {
