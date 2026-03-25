@@ -65,6 +65,12 @@
   word-break: break-word;
 }
 
+.userContent {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .thinkingDots {
   color: var(--text-secondary);
   font-size: 22px;

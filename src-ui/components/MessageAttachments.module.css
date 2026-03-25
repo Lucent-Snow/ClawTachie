@@ -1,0 +1,31 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.image {
+  width: 100%;
+  min-width: 0;
+  max-height: 260px;
+  object-fit: cover;
+  border: 1px solid color-mix(in srgb, var(--color-border) 75%, transparent 25%);
+  background: color-mix(in srgb, var(--surface) 82%, black 18%);
+}
+
+.label {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: 1.4;
+  word-break: break-word;
+}

@@ -2,6 +2,7 @@ import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   CharacterSpriteAsset,
+  GatewayChatAttachment,
   HelloOk,
   SessionsListResult,
   TtsSynthesizeRequest,
@@ -60,8 +61,9 @@ export async function gatewayDisconnect(): Promise<void> {
 export async function gatewaySendMessage(
   sessionKey: string,
   message: string,
+  attachments?: GatewayChatAttachment[],
 ): Promise<void> {
-  await invoke("gateway_send_message", { sessionKey, message });
+  await invoke("gateway_send_message", { sessionKey, message, attachments });
 }
 
 export async function gatewayHistory(

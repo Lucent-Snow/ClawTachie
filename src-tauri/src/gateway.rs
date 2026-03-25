@@ -121,6 +121,20 @@ pub struct GatewayModelOption {
     source: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GatewayChatAttachment {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "type")]
+    kind: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mime_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    file_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    content: Option<String>,
+}
+
 #[tauri::command]
 pub async fn gateway_connect(
     app: AppHandle,
@@ -223,12 +237,19 @@ pub async fn gateway_send_message(
     state: State<'_, GatewayState>,
     session_key: String,
     message: String,
+    attachments: Option<Vec<GatewayChatAttachment>>,
 ) -> Result<(), String> {
-    let params = json!({
+    let mut params = json!({
       "sessionKey": session_key,
       "message": message,
       "idempotencyKey": Uuid::new_v4().to_string(),
     });
+
+    if let Some(items) = attachments.filter(|items| !items.is_empty()) {
+        if let Value::Object(ref mut map) = params {
+            map.insert("attachments".to_string(), json!(items));
+        }
+    }
 
     let _ = send_request(state, "chat.send", params).await?;
     Ok(())

@@ -64,8 +64,15 @@ export interface ChatSendParams {
   idempotencyKey: string;
   thinking?: string;
   deliver?: boolean;
-  attachments?: unknown[];
+  attachments?: GatewayChatAttachment[];
   timeoutMs?: number;
+}
+
+export interface GatewayChatAttachment {
+  type?: string;
+  mimeType?: string;
+  fileName?: string;
+  content?: string;
 }
 
 export interface ChatHistoryParams {
@@ -122,6 +129,16 @@ export interface UIMessage {
   timestamp: number;
   displayKind?: "message" | "tool";
   toolLabel?: string | null;
+  attachments?: UIAttachment[];
+}
+
+export interface UIAttachment {
+  id: string;
+  kind: "image";
+  name: string | null;
+  mimeType: string | null;
+  url: string;
+  base64Content?: string | null;
 }
 
 export type TtsProvider = "none" | "mimo";

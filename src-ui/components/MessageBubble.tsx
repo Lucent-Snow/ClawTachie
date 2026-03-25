@@ -2,6 +2,7 @@ import type { UIMessage } from "../lib/types";
 import { getTachieLabel } from "../lib/emotions";
 import { useSettings } from "../stores/settings";
 import { AssistantMessageContent } from "./AssistantMessageContent";
+import { MessageAttachments } from "./MessageAttachments";
 import styles from "./MessageBubble.module.css";
 
 export function MessageBubble({
@@ -36,6 +37,9 @@ export function MessageBubble({
       )}
       {message.role === "assistant" ? (
         <div className={styles.assistantContent}>
+          {message.attachments && message.attachments.length > 0 && (
+            <MessageAttachments attachments={message.attachments} />
+          )}
           {message.content.trim() ? (
             <AssistantMessageContent
               content={message.content}
@@ -54,7 +58,12 @@ export function MessageBubble({
           )}
         </div>
       ) : (
-        <div className={styles.userText}>{message.content}</div>
+        <div className={styles.userContent}>
+          {message.attachments && message.attachments.length > 0 && (
+            <MessageAttachments attachments={message.attachments} />
+          )}
+          {message.content.trim() ? <div className={styles.userText}>{message.content}</div> : null}
+        </div>
       )}
     </div>
   );

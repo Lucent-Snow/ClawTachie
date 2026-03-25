@@ -8,6 +8,38 @@
   align-items: stretch;
 }
 
+.composerColumn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.inputRow {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.fileInput {
+  display: none;
+}
+
+.attachBtn {
+  padding: 0 18px;
+  min-width: 88px;
+  height: 48px;
+  align-self: flex-end;
+  border: 1px solid var(--primary-faint);
+  background: color-mix(in srgb, var(--surface) 88%, var(--surface-tint) 12%);
+  color: var(--primary);
+  font-family: var(--font-label);
+  font-size: var(--text-sm);
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+}
+
 .input {
   flex: 1;
   min-height: 60px;
@@ -24,6 +56,52 @@
 .input:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px var(--primary-faint);
+}
+
+.previewRow {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.previewCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 112px;
+  flex: 0 0 auto;
+}
+
+.previewImage {
+  width: 112px;
+  height: 112px;
+  object-fit: cover;
+  border: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--surface) 84%, black 16%);
+}
+
+.previewLabel {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.removeAttachmentBtn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.64);
+  color: white;
+  font-size: 14px;
+  line-height: 1;
 }
 
 .sendBtn {

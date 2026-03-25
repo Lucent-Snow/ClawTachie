@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import type { UIMessage, ChatEvent } from "../lib/types";
+import { attachmentsToGatewayPayload, extractImageAttachments } from "../lib/chat-attachments";
+import type { UIAttachment, UIMessage, ChatEvent } from "../lib/types";
 import { createStreamingParser, parseMessageTags } from "../lib/emotion";
 import { type TachieName } from "../lib/emotions";
 import { broadcastUserMessage } from "../lib/window-sync";
@@ -40,6 +41,16 @@ function extractContent(message: unknown): string | null {
       .join("");
   }
   return null;
+}
+
+function serializeAttachmentsKey(attachments: UIAttachment[] | undefined): string {
+  if (!attachments || attachments.length === 0) {
+    return "";
+  }
+
+  return attachments
+    .map((attachment) => `${attachment.kind}:${attachment.url}:${attachment.name ?? ""}`)
+    .join("|");
 }
 
 function extractToolContent(message: unknown): string | null {
@@ -155,8 +166,13 @@ function isHiddenHistoryMessage(message: unknown): boolean {
       const item = part as Record<string, unknown>;
       return item.type === "text" && typeof item.text === "string" && item.text.trim() !== "";
     });
+    const hasVisibleImage = content.some((part) => {
+      if (!part || typeof part !== "object") return false;
+      const item = part as Record<string, unknown>;
+      return item.type === "image";
+    });
 
-    if (!hasVisibleText) {
+    if (!hasVisibleText && !hasVisibleImage) {
       return true;
     }
   }
@@ -173,6 +189,7 @@ function normalizeHistoryMessage(message: unknown): UIMessage | null {
   const role = readMessageRole(entry);
   const isToolMessage = isToolHistoryMessage(entry);
   const content = isToolMessage ? extractToolContent(entry) ?? "" : extractContent(entry) ?? "";
+  const attachments = isToolMessage ? undefined : extractImageAttachments(entry);
   const parsed = isToolMessage ? null : parseMessageTags(content);
 
   if (!role) {
@@ -183,7 +200,10 @@ function normalizeHistoryMessage(message: unknown): UIMessage | null {
     return null;
   }
 
-  if (!isToolMessage && (!parsed || parsed.text.trim() === "")) {
+  if (
+    !isToolMessage &&
+    (!parsed || (parsed.text.trim() === "" && (!attachments || attachments.length === 0)))
+  ) {
     return null;
   }
 
@@ -196,6 +216,7 @@ function normalizeHistoryMessage(message: unknown): UIMessage | null {
     timestamp: (entry.createdAt as number) ?? Date.now(),
     displayKind: isToolMessage ? "tool" : "message",
     toolLabel: isToolMessage ? buildToolLabel(entry) : null,
+    attachments,
   };
 }
 
@@ -221,6 +242,7 @@ function dedupeMessages(messages: UIMessage[]): UIMessage[] {
       message.timestamp,
       message.displayKind ?? "message",
       message.toolLabel ?? "",
+      serializeAttachmentsKey(message.attachments),
     ].join("|");
 
     if (seenFallbackKeys.has(fallbackKey)) {
@@ -275,7 +297,7 @@ interface ChatState {
   isStreaming: boolean;
   currentRunId: string | null;
   lastGeneratedAssistantMessageId: string | null;
-  send: (sessionKey: string, text: string) => Promise<void>;
+  send: (sessionKey: string, text: string, attachments?: UIAttachment[]) => Promise<void>;
   abort: (sessionKey: string) => Promise<void>;
   loadHistory: (sessionKey: string) => Promise<void>;
   clearMessages: () => void;
@@ -294,7 +316,7 @@ export const useChat = create<ChatState>()((set, get) => ({
   currentRunId: null,
   lastGeneratedAssistantMessageId: null,
 
-  send: async (sessionKey, text) => {
+  send: async (sessionKey, text, attachments) => {
     useTts.getState().stop();
 
     const userMsg: UIMessage = {
@@ -306,6 +328,7 @@ export const useChat = create<ChatState>()((set, get) => ({
       timestamp: Date.now(),
       displayKind: "message",
       toolLabel: null,
+      attachments,
     };
     set((s) => ({ messages: [...s.messages, userMsg] }));
     resetStreamingState();
@@ -317,7 +340,7 @@ export const useChat = create<ChatState>()((set, get) => ({
       isStreaming: true,
     });
     try {
-      await gatewaySendMessage(sessionKey, text);
+      await gatewaySendMessage(sessionKey, text, attachmentsToGatewayPayload(attachments));
       void broadcastUserMessage(sessionKey, userMsg);
       void useGateway.getState().refreshSessions();
     } catch {
