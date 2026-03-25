@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { SessionRow } from "../lib/types";
+import type { SessionRow, SessionsListResult } from "../lib/types";
 import {
   gatewayConnect,
   gatewayDisconnect,
@@ -9,6 +9,7 @@ import {
   gatewaySessionsReset,
   type GatewaySessionPatch,
 } from "../lib/tauri-gateway";
+import { shouldReconnectGateway, stringifyGatewayError } from "../lib/gateway-errors";
 import { broadcastSettingsChange } from "../lib/window-sync";
 import { useChat } from "./chat";
 import { DEFAULT_SETTINGS, useSettings } from "./settings";
@@ -52,13 +53,33 @@ async function persistSessionKey(key: string) {
   });
 }
 
-async function reconnectGatewayIfNeeded(error: unknown, reconnect: () => Promise<void>) {
-  const message = error instanceof Error ? error.message : String(error);
-  if (!/gateway not connected/i.test(message)) {
-    throw error;
+async function reconnectGatewayFromSettings() {
+  const gateway = useSettings.getState().gateway;
+  const url = gateway.url.trim();
+  const token = gateway.token.trim();
+  if (!url || !token) {
+    throw new Error("gateway connection settings are incomplete");
   }
 
-  await reconnect();
+  await useGateway.getState().connect(url, token);
+
+  const { status, error } = useGateway.getState();
+  if (status !== "connected") {
+    throw new Error(error ?? "gateway reconnect failed");
+  }
+}
+
+async function retryGatewayRequest<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (!shouldReconnectGateway(error)) {
+      throw error;
+    }
+
+    await reconnectGatewayFromSettings();
+    return operation();
+  }
 }
 
 function mergeSessionMetadata(next: SessionRow, previous?: SessionRow): SessionRow {
@@ -69,6 +90,58 @@ function mergeSessionMetadata(next: SessionRow, previous?: SessionRow): SessionR
     ...next,
     ...(label ? { label } : {}),
     ...(displayName ? { displayName } : {}),
+  };
+}
+
+function sessionNamespace(key: string | null | undefined): string {
+  const normalized = key?.trim();
+  if (!normalized) {
+    return "agent:clawtachie";
+  }
+
+  const parts = normalized.split(":").filter(Boolean);
+  if (parts[0] === "agent" && parts.length >= 3) {
+    return `agent:${parts[1]}`;
+  }
+
+  if (parts.length >= 2) {
+    return `${parts[0]}:${parts[1]}`;
+  }
+
+  return normalized;
+}
+
+function buildNewSessionKey(sessions: SessionRow[], currentSessionKey: string | null, defaultSessionKey: string): string {
+  const namespace = sessionNamespace(currentSessionKey || defaultSessionKey);
+  const baseKey = `${namespace}:new-session`;
+  const existingKeys = new Set(sessions.map((session) => session.key));
+
+  if (!existingKeys.has(baseKey)) {
+    return baseKey;
+  }
+
+  let index = 1;
+  while (existingKeys.has(`${baseKey}${index}`)) {
+    index += 1;
+  }
+
+  return `${baseKey}${index}`;
+}
+
+function splitGatewayModelValue(model: string): { model: string; provider?: string } {
+  const normalized = model.trim();
+  if (!normalized) {
+    return { model: "" };
+  }
+
+  const slashIndex = normalized.indexOf("/");
+  if (slashIndex <= 0) {
+    return { model: normalized };
+  }
+
+  return {
+    provider: normalized.slice(0, slashIndex),
+    model: normalized.slice(slashIndex + 1),
   };
 }
 
@@ -89,10 +162,11 @@ export const useGateway = create<GatewayState>()((set, get) => ({
     set({ status: "connecting", error: null });
     try {
       await gatewayConnect(url, token);
-      await get().refreshSessions();
+      const result = await gatewaySessionsList();
+      applySessionsResult(result, set, get);
       set({ status: "connected", error: null });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = stringifyGatewayError(err);
       set({ status: "error", error: msg });
     }
   },
@@ -107,8 +181,12 @@ export const useGateway = create<GatewayState>()((set, get) => ({
   },
 
   createSession: async () => {
-    const key = `agent:clawtachie:${Date.now()}`;
-    await gatewaySessionsReset(key, "new");
+    const key = buildNewSessionKey(
+      get().sessions,
+      get().currentSessionKey,
+      useSettings.getState().gateway.sessionKey,
+    );
+    await retryGatewayRequest(() => gatewaySessionsReset(key, "new"));
     set((state) => ({
       currentSessionKey: key,
       openSessionKeys: state.openSessionKeys.includes(key)
@@ -122,7 +200,7 @@ export const useGateway = create<GatewayState>()((set, get) => ({
   },
 
   resetSession: async (key) => {
-    await gatewaySessionsReset(key);
+    await retryGatewayRequest(() => gatewaySessionsReset(key));
     if (get().currentSessionKey === key) {
       useChat.getState().clearMessages();
     }
@@ -142,7 +220,7 @@ export const useGateway = create<GatewayState>()((set, get) => ({
   deleteSession: async (key) => {
     const prev = get();
     const savedSessionKey = useSettings.getState().gateway.sessionKey;
-    await gatewaySessionsDelete(key);
+    await retryGatewayRequest(() => gatewaySessionsDelete(key));
     const sessions = prev.sessions.filter((session) => session.key !== key);
     const nextKey = prev.currentSessionKey === key ? sessions[0]?.key ?? null : prev.currentSessionKey;
     const nextDefaultKey =
@@ -172,7 +250,7 @@ export const useGateway = create<GatewayState>()((set, get) => ({
     const patch: GatewaySessionPatch = {
       label: normalized || null,
     };
-    await gatewaySessionsPatch(key, patch);
+    await retryGatewayRequest(() => gatewaySessionsPatch(key, patch));
     set((state) => ({
       sessions: state.sessions.map((session) =>
         session.key === key
@@ -193,29 +271,15 @@ export const useGateway = create<GatewayState>()((set, get) => ({
     const patch: GatewaySessionPatch = {
       model: normalized || null,
     };
-    try {
-      await gatewaySessionsPatch(key, patch);
-    } catch (error) {
-      await reconnectGatewayIfNeeded(error, async () => {
-        const gateway = useSettings.getState().gateway;
-        if (!gateway.url.trim() || !gateway.token.trim()) {
-          throw error;
-        }
-
-        await get().connect(gateway.url.trim(), gateway.token);
-        if (get().status !== "connected") {
-          throw error;
-        }
-
-        await gatewaySessionsPatch(key, patch);
-      });
-    }
+    const parsed = splitGatewayModelValue(normalized);
+    await retryGatewayRequest(() => gatewaySessionsPatch(key, patch));
     set((state) => ({
       sessions: state.sessions.map((session) =>
         session.key === key
           ? {
               ...session,
-              model: normalized || undefined,
+              model: parsed.model || undefined,
+              modelProvider: parsed.provider ?? session.modelProvider,
               updatedAt: Date.now(),
             }
           : session,
@@ -254,54 +318,56 @@ export const useGateway = create<GatewayState>()((set, get) => ({
   },
 
   refreshSessions: async () => {
-    try {
-      const result = await gatewaySessionsList();
-      const defaultKey = useSettings.getState().gateway.sessionKey;
-      const previousByKey = new Map(get().sessions.map((session) => [session.key, session]));
-      const currentSessionKey = get().currentSessionKey;
-      const fallbackCurrent = get().sessions.find((session) => session.key === currentSessionKey);
-      const sorted = result.sessions
-        .map((session) => mergeSessionMetadata(session, previousByKey.get(session.key)))
-        .sort(
-        (a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0),
-      );
-      const merged =
-        fallbackCurrent && !sorted.some((session) => session.key === fallbackCurrent.key)
-          ? [fallbackCurrent, ...sorted]
-          : sorted;
-      const previousOpenSessionKeys = get().openSessionKeys;
-      const openSessionKeys = previousOpenSessionKeys.filter((key) =>
-        merged.some((session) => session.key === key),
-      );
-      const resolvedCurrent =
-        currentSessionKey && merged.some((session) => session.key === currentSessionKey)
-          ? currentSessionKey
-          : null;
-
-      // Auto-select: prefer saved default, fallback to first session
-      const firstSession = merged[0];
-      if (!resolvedCurrent && firstSession) {
-        const match = merged.find((s) => s.key === defaultKey);
-        set({
-          sessions: merged,
-          currentSessionKey: match?.key ?? firstSession.key,
-          openSessionKeys:
-            openSessionKeys.length > 0
-              ? openSessionKeys
-              : [match?.key ?? firstSession.key],
-        });
-        return;
-      }
-      set({
-        sessions: merged,
-        currentSessionKey: resolvedCurrent,
-        openSessionKeys:
-          openSessionKeys.length > 0 || !resolvedCurrent
-            ? openSessionKeys
-            : [resolvedCurrent],
-      });
-    } catch {
-      // ignore — sessions list may not be available
-    }
+    const result = await retryGatewayRequest(() => gatewaySessionsList());
+    applySessionsResult(result, set, get);
   },
 }));
+
+function applySessionsResult(
+  result: SessionsListResult,
+  set: (partial: Partial<GatewayState> | ((state: GatewayState) => Partial<GatewayState>)) => void,
+  get: () => GatewayState,
+) {
+  const defaultKey = useSettings.getState().gateway.sessionKey;
+  const previousByKey = new Map(get().sessions.map((session) => [session.key, session]));
+  const currentSessionKey = get().currentSessionKey;
+  const fallbackCurrent = get().sessions.find((session) => session.key === currentSessionKey);
+  const sorted = result.sessions
+    .map((session) => mergeSessionMetadata(session, previousByKey.get(session.key)))
+    .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+  const merged =
+    fallbackCurrent && !sorted.some((session) => session.key === fallbackCurrent.key)
+      ? [fallbackCurrent, ...sorted]
+      : sorted;
+  const previousOpenSessionKeys = get().openSessionKeys;
+  const openSessionKeys = previousOpenSessionKeys.filter((key) =>
+    merged.some((session) => session.key === key),
+  );
+  const resolvedCurrent =
+    currentSessionKey && merged.some((session) => session.key === currentSessionKey)
+      ? currentSessionKey
+      : null;
+
+  const firstSession = merged[0];
+  if (!resolvedCurrent && firstSession) {
+    const match = merged.find((session) => session.key === defaultKey);
+    set({
+      sessions: merged,
+      currentSessionKey: match?.key ?? firstSession.key,
+      openSessionKeys:
+        openSessionKeys.length > 0
+          ? openSessionKeys
+          : [match?.key ?? firstSession.key],
+    });
+    return;
+  }
+
+  set({
+    sessions: merged,
+    currentSessionKey: resolvedCurrent,
+    openSessionKeys:
+      openSessionKeys.length > 0 || !resolvedCurrent
+        ? openSessionKeys
+        : [resolvedCurrent],
+  });
+}

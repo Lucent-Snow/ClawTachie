@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { attachmentsToGatewayPayload, extractImageAttachments } from "../lib/chat-attachments";
+import { shouldReconnectGateway } from "../lib/gateway-errors";
 import type { UIAttachment, UIMessage, ChatEvent } from "../lib/types";
 import { createStreamingParser, parseMessageTags } from "../lib/emotion";
 import { type TachieName } from "../lib/emotions";
@@ -254,13 +255,28 @@ function dedupeMessages(messages: UIMessage[]): UIMessage[] {
   });
 }
 
+function messagesEquivalent(left: UIMessage | undefined, right: UIMessage | undefined): boolean {
+  if (!left || !right) {
+    return false;
+  }
+
+  return (
+    left.role === right.role &&
+    left.content === right.content &&
+    (left.tachie ?? null) === (right.tachie ?? null) &&
+    (left.style ?? null) === (right.style ?? null) &&
+    (left.displayKind ?? "message") === (right.displayKind ?? "message") &&
+    (left.toolLabel ?? null) === (right.toolLabel ?? null) &&
+    serializeAttachmentsKey(left.attachments) === serializeAttachmentsKey(right.attachments)
+  );
+}
+
 let rawStreamBuffer = "";
 const streamingParser = createStreamingParser();
 let historyLoadRequestId = 0;
 
 async function reconnectForHistoryIfNeeded(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-  if (!/gateway not connected/i.test(message)) {
+  if (!shouldReconnectGateway(error)) {
     throw error;
   }
 
@@ -343,23 +359,35 @@ export const useChat = create<ChatState>()((set, get) => ({
       await gatewaySendMessage(sessionKey, text, attachmentsToGatewayPayload(attachments));
       void broadcastUserMessage(sessionKey, userMsg);
       void useGateway.getState().refreshSessions();
-    } catch {
-      set((state) => {
-        const messages = state.messages.filter((message) => message.id !== userMsg.id);
-        return {
-          messages,
-          currentTachie: deriveTachieFromHistory(messages),
-          streamingText: "",
-          streamingTachie: null,
-          streamingStyle: null,
-          isStreaming: false,
-        };
-      });
+    } catch (error) {
+      try {
+        await reconnectForHistoryIfNeeded(error);
+        await gatewaySendMessage(sessionKey, text, attachmentsToGatewayPayload(attachments));
+        void broadcastUserMessage(sessionKey, userMsg);
+        void useGateway.getState().refreshSessions();
+      } catch {
+        set((state) => {
+          const messages = state.messages.filter((message) => message.id !== userMsg.id);
+          return {
+            messages,
+            currentTachie: deriveTachieFromHistory(messages),
+            streamingText: "",
+            streamingTachie: null,
+            streamingStyle: null,
+            isStreaming: false,
+          };
+        });
+      }
     }
   },
 
   abort: async (sessionKey) => {
-    await gatewayChatAbort(sessionKey);
+    try {
+      await gatewayChatAbort(sessionKey);
+    } catch (error) {
+      await reconnectForHistoryIfNeeded(error);
+      await gatewayChatAbort(sessionKey);
+    }
     get().finalizeStream();
   },
 
@@ -534,7 +562,10 @@ export const useChat = create<ChatState>()((set, get) => ({
     const nextTachie = parsed.tachie ?? "normal";
     resetStreamingState();
     set((s) => ({
-      messages: nextMessage ? dedupeMessages([...s.messages, nextMessage]) : s.messages,
+      messages:
+        nextMessage && !messagesEquivalent(s.messages.at(-1), nextMessage)
+          ? dedupeMessages([...s.messages, nextMessage])
+          : s.messages,
       streamingText: "",
       streamingTachie: null,
       streamingStyle: null,

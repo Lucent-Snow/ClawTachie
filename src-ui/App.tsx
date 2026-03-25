@@ -5,6 +5,7 @@ import { useUpdater } from "./stores/updater";
 import { useGateway } from "./stores/gateway";
 import { useChat } from "./stores/chat";
 import { hasTauriBackend, setPetWindowVisible, subscribeGatewayEvents } from "./lib/tauri-gateway";
+import { stringifyGatewayError } from "./lib/gateway-errors";
 import { subscribeWindowSync } from "./lib/window-sync";
 import { MainWindow } from "./windows/MainWindow";
 import { PetWindow } from "./windows/PetWindow";
@@ -58,9 +59,13 @@ export function App() {
         setStatus("reconnecting");
       },
       onConnected: () => {
-        void refreshSessions().finally(() => {
-          setStatus("connected");
-        });
+        void refreshSessions()
+          .then(() => {
+            setStatus("connected");
+          })
+          .catch((error) => {
+            setStatus("error", stringifyGatewayError(error));
+          });
       },
     }).then((fns) => {
       if (cancelled) { fns.forEach((f) => f()); return; }

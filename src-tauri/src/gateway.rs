@@ -655,6 +655,7 @@ async fn run_gateway_loop(
             });
             if writer.send(Message::Text(frame.to_string().into())).await.is_err() {
               emit_error(&app, "tick send failed");
+              emit_disconnected(&app, 1006, "tick send failed");
               break;
             }
           }
@@ -671,6 +672,7 @@ async fn run_gateway_loop(
                 if let Err(err) = writer.send(Message::Text(frame.to_string().into())).await {
                   let _ = response.send(Err(err.to_string()));
                   emit_error(&app, "request send failed");
+                  emit_disconnected(&app, 1006, "request send failed");
                   break;
                 }
                 pending.insert(request_id, response);

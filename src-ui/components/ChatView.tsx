@@ -11,6 +11,16 @@ import { MessageBubble } from "./MessageBubble";
 import { Composer } from "./Composer";
 import styles from "./ChatView.module.css";
 
+function composeGatewayModelValue(model: string | null | undefined, provider?: string | null): string {
+  const normalizedModel = model?.trim() ?? "";
+  if (!normalizedModel) {
+    return "";
+  }
+
+  const normalizedProvider = provider?.trim() ?? "";
+  return normalizedProvider ? `${normalizedProvider}/${normalizedModel}` : normalizedModel;
+}
+
 export function ChatView() {
   const messages = useChat((s) => s.messages);
   const streamingText = useChat((s) => s.streamingText);
@@ -34,11 +44,12 @@ export function ChatView() {
   ]);
 
   const session = sessions.find((s) => s.key === currentKey);
+  const sessionModelValue = composeGatewayModelValue(session?.model, session?.modelProvider);
   const availableModels = useMemo(() => {
     const options = new Map<string, { value: string; label: string }>();
 
     for (const option of catalogModels) {
-      const value = option.id.trim();
+      const value = composeGatewayModelValue(option.id, option.provider);
       if (!value || options.has(value)) {
         continue;
       }
@@ -58,14 +69,14 @@ export function ChatView() {
   }, [availableModels, modelDraft]);
 
   const currentModelMissing =
-    Boolean(session?.model) &&
-    !availableModels.some((option) => option.value === session?.model);
+    Boolean(sessionModelValue) &&
+    !availableModels.some((option) => option.value === sessionModelValue);
 
   useEffect(() => {
-    setModelDraft(session?.model ?? "");
+    setModelDraft(sessionModelValue);
     setModelError(null);
     setIsApplyingModel(false);
-  }, [session?.key, session?.model]);
+  }, [session?.key, sessionModelValue]);
 
   useEffect(() => {
     let cancelled = false;
@@ -117,13 +128,13 @@ export function ChatView() {
       }
     : null;
 
-  const handleModelApply = async () => {
+  const handleModelApply = async (nextModel = modelDraft) => {
     if (!currentKey || !connected || isStreaming || isApplyingModel) {
       return;
     }
 
-    const normalized = modelDraft.trim();
-    if (normalized === (session?.model ?? "")) {
+    const normalized = nextModel.trim();
+    if (normalized === sessionModelValue) {
       setModelError(null);
       return;
     }
@@ -138,6 +149,7 @@ export function ChatView() {
     } catch (error) {
       if (modelRequestIdRef.current === requestId) {
         setModelError(error instanceof Error ? error.message : String(error));
+        setModelDraft(sessionModelValue);
       }
     } finally {
       if (modelRequestIdRef.current === requestId) {
@@ -162,8 +174,12 @@ export function ChatView() {
           className={styles.modelSelect}
           value={selectedKnownModel}
           onChange={(event) => {
-            setModelDraft(event.target.value);
+            const nextValue = event.target.value;
+            setModelDraft(nextValue);
             setModelError(null);
+            if (nextValue) {
+              void handleModelApply(nextValue);
+            }
           }}
           disabled={modelSwitchDisabled || availableModels.length === 0}
         >
@@ -180,24 +196,13 @@ export function ChatView() {
             </option>
           ))}
         </select>
-        <button
-          type="button"
-          className={styles.modelApplyBtn}
-          onClick={() => void handleModelApply()}
-          disabled={modelSwitchDisabled || !selectedKnownModel}
-        >
-          {isApplyingModel ? "切换中..." : "切换"}
-        </button>
         <span className={styles.modelHint}>
-          {isLoadingModels
-            ? "正在同步模型候选..."
-            : availableModels.length > 0
-              ? `候选 ${availableModels.length} 个`
-              : "网关没有返回可选模型列表"}
+          {isLoadingModels ? "正在同步模型候选..." : "选择后立即切换"}
         </span>
+        {isApplyingModel && <span className={styles.modelHint}>切换中...</span>}
         {currentModelMissing && (
           <span className={styles.modelHint}>
-            当前模型 {session?.model} 不在可选列表中
+            当前模型 {sessionModelValue} 不在可选列表中
           </span>
         )}
         {modelError && <span className={styles.modelError}>{modelError}</span>}
