@@ -161,6 +161,10 @@ export async function setPetWindowVisible(visible: boolean): Promise<void> {
   await invoke("set_pet_window_visible", { visible });
 }
 
+export async function getUpdaterProxy(): Promise<string | null> {
+  return invoke<string | null>("get_updater_proxy");
+}
+
 export async function subscribeGatewayEvents(listeners: {
   onChatEvent: (payload: Record<string, unknown>) => void;
   onRunEnd: () => void;

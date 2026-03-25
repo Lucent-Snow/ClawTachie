@@ -1,6 +1,7 @@
 mod characters;
 mod gateway;
 mod tts;
+mod updater;
 
 use tauri::{AppHandle, Manager};
 
@@ -41,6 +42,11 @@ fn set_pet_window_visible(app: AppHandle, visible: bool) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn get_updater_proxy() -> Option<String> {
+    updater::detect_updater_proxy()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default()
@@ -52,6 +58,7 @@ pub fn run() {
             start_current_window_dragging,
             exit_app,
             set_pet_window_visible,
+            get_updater_proxy,
             tts::tts_synthesize,
             gateway::gateway_connect,
             gateway::gateway_disconnect,

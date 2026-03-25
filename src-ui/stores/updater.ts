@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { getVersion } from "@tauri-apps/api/app";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check } from "@tauri-apps/plugin-updater";
-import { hasTauriBackend } from "../lib/tauri-gateway";
+import { getUpdaterProxy, hasTauriBackend } from "../lib/tauri-gateway";
 
 export type UpdateStatus =
   | "idle"
@@ -97,7 +97,8 @@ export const useUpdater = create<UpdaterState>()((set, get) => ({
       });
 
       try {
-        const update = await check();
+        const proxy = await getUpdaterProxy();
+        const update = await check(proxy ? { proxy } : undefined);
 
         if (!update) {
           set((state) => ({
