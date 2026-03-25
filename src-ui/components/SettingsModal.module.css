@@ -178,7 +178,20 @@
   min-height: 84px;
 }
 
+.codeArea {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  white-space: pre;
+}
+
 .grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metaGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
@@ -207,6 +220,14 @@
 
 .errorText {
   color: var(--error);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.successText {
+  color: var(--success);
   font-size: var(--text-sm);
   line-height: 1.5;
   white-space: pre-wrap;
@@ -293,6 +314,9 @@
   }
   .navItemActive::before { transform: scaleX(1); }
   .grid {
+    grid-template-columns: 1fr;
+  }
+  .metaGrid {
     grid-template-columns: 1fr;
   }
 }

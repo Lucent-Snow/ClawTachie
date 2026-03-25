@@ -58,10 +58,14 @@ pub fn run() {
             gateway::gateway_send_message,
             gateway::gateway_history,
             gateway::gateway_sessions_list,
+            gateway::gateway_models_list,
             gateway::gateway_sessions_reset,
             gateway::gateway_sessions_patch,
             gateway::gateway_sessions_delete,
             gateway::gateway_chat_abort,
+            gateway::gateway_config_get,
+            gateway::gateway_config_schema,
+            gateway::gateway_config_patch,
         ]);
 
     #[cfg(debug_assertions)]

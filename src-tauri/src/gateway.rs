@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs,
     path::PathBuf,
     sync::{
@@ -111,6 +111,14 @@ struct ResponseFrame {
 #[derive(Debug, Deserialize)]
 struct ResponseError {
     message: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct GatewayModelOption {
+    id: String,
+    label: String,
+    provider: Option<String>,
+    source: String,
 }
 
 #[tauri::command]
@@ -254,6 +262,12 @@ pub async fn gateway_sessions_list(state: State<'_, GatewayState>) -> Result<Val
 }
 
 #[tauri::command]
+pub async fn gateway_models_list(state: State<'_, GatewayState>) -> Result<Vec<GatewayModelOption>, String> {
+    let payload = send_request(state, "models.list", json!({})).await?;
+    Ok(extract_gateway_model_options(&payload))
+}
+
+#[tauri::command]
 pub async fn gateway_sessions_reset(
     state: State<'_, GatewayState>,
     session_key: String,
@@ -302,6 +316,52 @@ pub async fn gateway_chat_abort(
     });
     let _ = send_request(state, "chat.abort", params).await?;
     Ok(())
+}
+
+#[tauri::command]
+pub async fn gateway_config_get(state: State<'_, GatewayState>) -> Result<Value, String> {
+    send_request(state, "config.get", json!({})).await
+}
+
+#[tauri::command]
+pub async fn gateway_config_schema(state: State<'_, GatewayState>) -> Result<Value, String> {
+    send_request(state, "config.schema", json!({})).await
+}
+
+#[tauri::command]
+pub async fn gateway_config_patch(
+    state: State<'_, GatewayState>,
+    raw: String,
+    base_hash: String,
+    session_key: Option<String>,
+    note: Option<String>,
+    restart_delay_ms: Option<u32>,
+) -> Result<Value, String> {
+    let mut params = json!({
+        "raw": raw,
+        "baseHash": base_hash,
+    });
+
+    let Value::Object(ref mut object) = params else {
+        return Err("invalid config patch params".to_string());
+    };
+
+    if let Some(session_key) = session_key.filter(|value| !value.trim().is_empty()) {
+        object.insert("sessionKey".to_string(), Value::String(session_key));
+    }
+
+    if let Some(note) = note.filter(|value| !value.trim().is_empty()) {
+        object.insert("note".to_string(), Value::String(note));
+    }
+
+    if let Some(restart_delay_ms) = restart_delay_ms {
+        object.insert(
+            "restartDelayMs".to_string(),
+            Value::Number(restart_delay_ms.into()),
+        );
+    }
+
+    send_request(state, "config.patch", params).await
 }
 
 async fn send_request(
@@ -755,6 +815,104 @@ fn load_or_create_identity() -> Result<StoredIdentity, String> {
 fn identity_path() -> Result<PathBuf, String> {
     let home = dirs::home_dir().ok_or_else(|| "failed to resolve home directory".to_string())?;
     Ok(home.join(".clawtachie").join("device.json"))
+}
+
+fn extract_gateway_model_options(payload: &Value) -> Vec<GatewayModelOption> {
+    let mut models = Vec::new();
+    let mut seen = HashSet::new();
+    collect_gateway_model_options(payload, &mut models, &mut seen, None);
+    models.sort_by(|left, right| left.id.to_lowercase().cmp(&right.id.to_lowercase()));
+    models
+}
+
+fn collect_gateway_model_options(
+    value: &Value,
+    models: &mut Vec<GatewayModelOption>,
+    seen: &mut HashSet<String>,
+    provider_hint: Option<&str>,
+) {
+    match value {
+        Value::Array(items) => {
+            for item in items {
+                collect_gateway_model_options(item, models, seen, provider_hint);
+            }
+        }
+        Value::Object(object) => {
+            if let Some(id) = object.get("id").and_then(Value::as_str) {
+                let label = object
+                    .get("label")
+                    .and_then(Value::as_str)
+                    .or_else(|| object.get("name").and_then(Value::as_str))
+                    .map(|value| value.to_string());
+                let provider = object
+                    .get("provider")
+                    .and_then(Value::as_str)
+                    .or_else(|| object.get("providerId").and_then(Value::as_str))
+                    .map(|value| value.to_string())
+                    .or_else(|| provider_hint.map(|value| value.to_string()));
+                let source = object
+                    .get("source")
+                    .and_then(Value::as_str)
+                    .unwrap_or("gateway");
+
+                push_model_option(models, seen, id, label, provider, source);
+                return;
+            }
+
+            if let Some(items) = object.get("models").or_else(|| object.get("items")) {
+                collect_gateway_model_options(items, models, seen, provider_hint);
+            }
+
+            if let Some(entries) = object.get("entries") {
+                collect_gateway_model_options(entries, models, seen, provider_hint);
+            }
+
+            if let Some(providers) = object.get("providers").and_then(Value::as_object) {
+                for (provider_id, provider_value) in providers {
+                    collect_gateway_model_options(
+                        provider_value,
+                        models,
+                        seen,
+                        Some(provider_id.as_str()),
+                    );
+                }
+            }
+        }
+        Value::String(id) => {
+            push_model_option(models, seen, id, None, provider_hint.map(|value| value.to_string()), "gateway");
+        }
+        _ => {}
+    }
+}
+
+fn push_model_option(
+    models: &mut Vec<GatewayModelOption>,
+    seen: &mut HashSet<String>,
+    model_id: &str,
+    name: Option<String>,
+    provider: Option<String>,
+    source: impl Into<String>,
+) {
+    let trimmed = model_id.trim();
+    if trimmed.is_empty() || !seen.insert(trimmed.to_string()) {
+        return;
+    }
+
+    let label = match (name.as_deref(), provider.as_deref()) {
+        (Some(name), Some(provider)) if !name.trim().is_empty() && name != trimmed => {
+            format!("{name} · {provider}")
+        }
+        (Some(name), _) if !name.trim().is_empty() && name != trimmed => name.to_string(),
+        (_, Some(provider)) => format!("{trimmed} · {provider}"),
+        _ => trimmed.to_string(),
+    };
+
+    models.push(GatewayModelOption {
+        id: trimmed.to_string(),
+        label,
+        provider,
+        source: source.into(),
+    });
 }
 
 fn fingerprint_public_key(public_key_pem: &str) -> Result<String, String> {

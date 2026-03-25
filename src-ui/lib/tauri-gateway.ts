@@ -35,6 +35,13 @@ export interface GatewaySessionPatch {
   groupActivation?: "mention" | "always" | null;
 }
 
+export interface GatewayModelOption {
+  id: string;
+  label: string;
+  provider?: string | null;
+  source: string;
+}
+
 export function hasTauriBackend(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
@@ -68,6 +75,10 @@ export async function gatewaySessionsList(): Promise<SessionsListResult> {
   return invoke("gateway_sessions_list");
 }
 
+export async function gatewayModelsList(): Promise<GatewayModelOption[]> {
+  return invoke("gateway_models_list");
+}
+
 export async function gatewaySessionsReset(
   sessionKey: string,
   reason: "new" | "reset" = "reset",
@@ -88,6 +99,30 @@ export async function gatewaySessionsDelete(sessionKey: string): Promise<void> {
 
 export async function gatewayChatAbort(sessionKey: string): Promise<void> {
   await invoke("gateway_chat_abort", { sessionKey });
+}
+
+export async function gatewayConfigGet(): Promise<Record<string, unknown>> {
+  return invoke("gateway_config_get");
+}
+
+export async function gatewayConfigSchema(): Promise<Record<string, unknown>> {
+  return invoke("gateway_config_schema");
+}
+
+export async function gatewayConfigPatch(params: {
+  raw: string;
+  baseHash: string;
+  sessionKey?: string | null;
+  note?: string | null;
+  restartDelayMs?: number | null;
+}): Promise<Record<string, unknown>> {
+  return invoke("gateway_config_patch", {
+    raw: params.raw,
+    baseHash: params.baseHash,
+    sessionKey: params.sessionKey ?? null,
+    note: params.note ?? null,
+    restartDelayMs: params.restartDelayMs ?? null,
+  });
 }
 
 export async function loadCharacterSprites(): Promise<CharacterSpriteAsset[]> {
