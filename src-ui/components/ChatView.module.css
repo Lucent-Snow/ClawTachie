@@ -15,6 +15,7 @@
 .infoBar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 8px 16px;
   border-bottom: 1px solid var(--primary-faint);
@@ -23,13 +24,53 @@
   background: var(--surface);
 }
 
-.modelTag {
-  display: inline-block;
-  padding: 1px 6px;
+.infoLabel {
+  font-family: var(--font-label);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+.modelInput {
+  min-width: 220px;
+  max-width: min(44vw, 420px);
+  padding: 6px 10px;
+  border: 1px solid var(--primary-faint);
+  background: color-mix(in srgb, var(--surface) 92%, var(--surface-tint) 8%);
+  color: var(--text);
+}
+
+.modelInput:disabled {
+  color: var(--text-tertiary);
+}
+
+.modelApplyBtn {
+  padding: 6px 10px;
   background: var(--primary-faint);
   color: var(--primary);
+  transition: background var(--transition-normal), color var(--transition-normal);
+}
+
+.modelApplyBtn:hover:enabled {
+  background: color-mix(in srgb, var(--primary-faint) 55%, white 45%);
+}
+
+.modelApplyBtn:disabled {
+  cursor: default;
+  color: var(--text-tertiary);
+}
+
+.modelMeta {
+  min-width: 0;
   font-size: var(--text-xs);
+  color: var(--text-tertiary);
   font-family: var(--font-mono);
+}
+
+.modelError {
+  color: var(--error);
+  font-size: var(--text-xs);
 }
 
 .messages {
@@ -41,53 +82,6 @@
   display: flex;
   flex-direction: column;
   gap: 30px;
-}
-
-.streaming {
-  align-self: flex-start;
-  max-width: 80%;
-  padding: 20px 30px;
-  background: var(--surface-tint);
-  border-left: 2px solid var(--primary);
-  font-size: var(--text-base);
-  line-height: 1.6;
-}
-
-.emotionTag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 8px;
-  padding: 2px 6px;
-  background: var(--primary-faint);
-  color: var(--primary);
-  font-size: var(--text-xs);
-  line-height: 1.2;
-}
-
-.streamingBody {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-}
-
-.streamingMarkdown {
-  width: 100%;
-}
-
-.thinkingDots {
-  color: var(--text-secondary);
-  font-size: 22px;
-  line-height: 1;
-  letter-spacing: 0.12em;
-  animation: thinking-pulse 1.1s ease-in-out infinite;
-}
-
-.cursor {
-  display: inline-block;
-  line-height: 1;
-  animation: cursor-blink 1s infinite;
 }
 
 .scrollToBottomBtn {
@@ -119,27 +113,4 @@
   justify-content: center;
   color: var(--text-tertiary);
   font-size: var(--text-md);
-}
-
-@keyframes cursor-blink {
-  0%,
-  50% {
-    opacity: 1;
-  }
-
-  51%,
-  100% {
-    opacity: 0;
-  }
-}
-
-@keyframes thinking-pulse {
-  0%,
-  100% {
-    opacity: 0.35;
-  }
-
-  50% {
-    opacity: 1;
-  }
 }

@@ -4,7 +4,13 @@ import { useSettings } from "../stores/settings";
 import { AssistantMessageContent } from "./AssistantMessageContent";
 import styles from "./MessageBubble.module.css";
 
-export function MessageBubble({ message }: { message: UIMessage }) {
+export function MessageBubble({
+  message,
+  isStreaming = false,
+}: {
+  message: UIMessage;
+  isStreaming?: boolean;
+}) {
   const petEnabled = useSettings((s) => s.pet.enabled);
   const isToolMessage = message.displayKind === "tool";
   const cls = message.role === "user"
@@ -29,11 +35,24 @@ export function MessageBubble({ message }: { message: UIMessage }) {
         </div>
       )}
       {message.role === "assistant" ? (
-        <AssistantMessageContent
-          content={message.content}
-          toolLabel={message.toolLabel}
-          forceToolBlock={isToolMessage}
-        />
+        <div className={styles.assistantContent}>
+          {message.content.trim() ? (
+            <AssistantMessageContent
+              content={message.content}
+              toolLabel={message.toolLabel}
+              forceToolBlock={isToolMessage}
+            />
+          ) : isStreaming ? (
+            <div className={styles.thinkingDots} aria-label="AI thinking">
+              ……
+            </div>
+          ) : null}
+          {isStreaming && message.content.trim() && (
+            <span className={styles.cursor} aria-hidden="true">
+              &#9612;
+            </span>
+          )}
+        </div>
       ) : (
         <div className={styles.userText}>{message.content}</div>
       )}
