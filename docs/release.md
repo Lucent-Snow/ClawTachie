@@ -27,6 +27,14 @@ The desktop app checks GitHub Releases here:
 
 This file is generated automatically by the Tauri release build once the updater artifacts are signed.
 
+## Key Rotation Warning
+
+If you replace `TAURI_SIGNING_PRIVATE_KEY`, you must also update the embedded updater public key in `src-tauri/tauri.conf.json`.
+
+Otherwise the installed app will fail to verify `latest.json` with an error like `The signature was created with a different key than the one provided`.
+
+Existing installs built with the old embedded public key cannot auto-update across that key rotation. They need one manual reinstall of a build that embeds the new public key.
+
 ## Release Flow
 
 1. Update the version in `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`.

@@ -30,13 +30,21 @@ interface UpdaterState {
 let initializePromise: Promise<void> | null = null;
 let checkPromise: Promise<boolean> | null = null;
 
+function formatKnownUpdateError(message: string): string {
+  if (message.includes("different key than the one provided")) {
+    return "当前安装的版本使用了旧的更新签名，无法直接自动更新。请手动下载安装一次最新版本，之后自动更新会恢复正常。";
+  }
+
+  return message;
+}
+
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
-    return error.message;
+    return formatKnownUpdateError(error.message);
   }
 
   if (typeof error === "string") {
-    return error;
+    return formatKnownUpdateError(error);
   }
 
   return "Unknown update error";

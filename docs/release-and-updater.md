@@ -22,6 +22,10 @@ Local key paths:
 - `C:\Users\William\.tauri\clawtachie-updater.key`
 - `C:\Users\William\.tauri\clawtachie-updater.key.pub`
 
+If the GitHub secret `TAURI_SIGNING_PRIVATE_KEY` is rotated, `src-tauri/tauri.conf.json` must be updated to embed the matching public key before the next release.
+
+Otherwise updater verification will fail with `The signature was created with a different key than the one provided`, and existing installs using the old embedded public key will require a manual reinstall to move onto the new signing chain.
+
 ## Release Flow
 
 1. Update the version in `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`.
