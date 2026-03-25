@@ -254,6 +254,45 @@ pub async fn gateway_sessions_list(state: State<'_, GatewayState>) -> Result<Val
 }
 
 #[tauri::command]
+pub async fn gateway_sessions_reset(
+    state: State<'_, GatewayState>,
+    session_key: String,
+    reason: Option<String>,
+) -> Result<(), String> {
+    let params = json!({
+        "key": session_key,
+        "reason": reason.unwrap_or_else(|| "reset".to_string()),
+    });
+    let _ = send_request(state, "sessions.reset", params).await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn gateway_sessions_patch(
+    state: State<'_, GatewayState>,
+    session_key: String,
+    patch: Value,
+) -> Result<Value, String> {
+    let Value::Object(mut params) = patch else {
+        return Err("patch must be an object".to_string());
+    };
+    params.insert("key".to_string(), Value::String(session_key));
+    send_request(state, "sessions.patch", Value::Object(params)).await
+}
+
+#[tauri::command]
+pub async fn gateway_sessions_delete(
+    state: State<'_, GatewayState>,
+    session_key: String,
+) -> Result<(), String> {
+    let params = json!({
+        "key": session_key,
+    });
+    let _ = send_request(state, "sessions.delete", params).await?;
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn gateway_chat_abort(
     state: State<'_, GatewayState>,
     session_key: String,
@@ -340,10 +379,17 @@ async fn perform_handshake(
     token: &str,
     nonce: &str,
 ) -> Result<HelloOk, String> {
-    let signed_at_ms = now_ms();
     let platform = node_platform();
-    let scopes = ["operator.read", "operator.write"];
+    let scopes = [
+        "operator.admin",
+        "operator.read",
+        "operator.write",
+        "operator.approvals",
+        "operator.pairing",
+        "operator.talk.secrets",
+    ];
     let request_id = Uuid::new_v4().to_string();
+    let signed_at_ms = now_ms();
     let payload = build_auth_payload_v3(
         &identity.device_id,
         CLIENT_ID,

@@ -1,8 +1,11 @@
-// Gateway WebSocket client — connect handshake, request/response, event handling
-
 import { WebSocket } from "ws";
 import crypto from "node:crypto";
-import { loadOrCreateIdentity, publicKeyRawBase64Url, signPayload, buildAuthPayloadV3 } from "./device-identity.js";
+import {
+  loadOrCreateIdentity,
+  publicKeyRawBase64Url,
+  signPayload,
+  buildAuthPayloadV3,
+} from "./device-identity.js";
 import type { ConnectParams, HelloOk, Frame, EventFrame, ResponseFrame } from "./types.js";
 
 const PROTOCOL_VERSION = 3;
@@ -134,12 +137,18 @@ export class GatewayClient {
     if (!nonce) return;
 
     const role = "operator";
-    const scopes = ["operator.read", "operator.write"];
-    const signedAtMs = Date.now();
+    const scopes = [
+      "operator.admin",
+      "operator.read",
+      "operator.write",
+      "operator.approvals",
+      "operator.pairing",
+      "operator.talk.secrets",
+    ];
     const platform = process.platform;
-    // Must use predefined values from GATEWAY_CLIENT_IDS / GATEWAY_CLIENT_MODES
     const clientId = "gateway-client";
     const clientMode = "backend";
+    const signedAtMs = Date.now();
 
     const authPayload = buildAuthPayloadV3({
       deviceId: this.identity.deviceId,

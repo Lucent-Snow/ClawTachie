@@ -17,6 +17,24 @@ export interface GatewayErrorEvent {
   message: string;
 }
 
+export interface GatewaySessionPatch {
+  label?: string | null;
+  thinkingLevel?: string | null;
+  model?: string | null;
+  verboseLevel?: string | null;
+  reasoningLevel?: string | null;
+  responseUsage?: "off" | "tokens" | "full" | "on" | null;
+  elevatedLevel?: string | null;
+  execHost?: string | null;
+  execSecurity?: string | null;
+  execAsk?: string | null;
+  execNode?: string | null;
+  spawnedBy?: string | null;
+  spawnDepth?: number | null;
+  sendPolicy?: "allow" | "deny" | null;
+  groupActivation?: "mention" | "always" | null;
+}
+
 export function hasTauriBackend(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
@@ -48,6 +66,24 @@ export async function gatewayHistory(
 
 export async function gatewaySessionsList(): Promise<SessionsListResult> {
   return invoke("gateway_sessions_list");
+}
+
+export async function gatewaySessionsReset(
+  sessionKey: string,
+  reason: "new" | "reset" = "reset",
+): Promise<void> {
+  await invoke("gateway_sessions_reset", { sessionKey, reason });
+}
+
+export async function gatewaySessionsPatch(
+  sessionKey: string,
+  patch: GatewaySessionPatch,
+): Promise<void> {
+  await invoke("gateway_sessions_patch", { sessionKey, patch });
+}
+
+export async function gatewaySessionsDelete(sessionKey: string): Promise<void> {
+  await invoke("gateway_sessions_delete", { sessionKey });
 }
 
 export async function gatewayChatAbort(sessionKey: string): Promise<void> {

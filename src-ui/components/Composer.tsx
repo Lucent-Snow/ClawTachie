@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useChat } from "../stores/chat";
 import { useGateway } from "../stores/gateway";
 import styles from "./Composer.module.css";
@@ -11,7 +11,12 @@ export function Composer() {
   const abort = useChat((s) => s.abort);
   const status = useGateway((s) => s.status);
   const sessionKey = useGateway((s) => s.currentSessionKey);
+  const composerFocusToken = useGateway((s) => s.composerFocusToken);
   const connected = status === "connected";
+
+  useEffect(() => {
+    ref.current?.focus();
+  }, [composerFocusToken]);
 
   const handleSend = useCallback(() => {
     const trimmed = text.trim();

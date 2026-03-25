@@ -94,9 +94,11 @@ export interface SessionRow {
   key: string;
   kind: "direct" | "group";
   displayName?: string;
+  label?: string;
   updatedAt: number | null;
   model?: string;
   modelProvider?: string;
+  localOnly?: boolean;
 }
 
 export interface SessionsListResult {
@@ -118,6 +120,8 @@ export interface UIMessage {
   tachie: TachieName | null;
   style: string | null;
   timestamp: number;
+  displayKind?: "message" | "tool";
+  toolLabel?: string | null;
 }
 
 export type TtsProvider = "none" | "mimo";

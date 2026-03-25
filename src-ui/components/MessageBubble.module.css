@@ -22,8 +22,6 @@
   align-self: flex-end;
   background: var(--primary);
   color: var(--text-inverse);
-  white-space: pre-wrap;
-  word-break: break-word;
 }
 
 .user .meta {
@@ -35,6 +33,12 @@
   align-self: flex-start;
   background: var(--surface-tint);
   border-left: 2px solid var(--primary);
+}
+
+.tool {
+  align-self: flex-start;
+  background: color-mix(in srgb, var(--surface-tint) 70%, var(--surface) 30%);
+  border-left: 2px solid var(--color-border);
 }
 
 .emotionTag {
@@ -49,36 +53,7 @@
   line-height: 1.2;
 }
 
-/* Markdown inside assistant bubbles */
-.assistant p { margin: 0 0 8px; }
-.assistant p:last-child { margin-bottom: 0; }
-.assistant ul, .assistant ol { margin: 4px 0 8px 18px; }
-.assistant code {
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  background: rgba(0, 0, 0, 0.06);
-  padding: 1px 4px;
-}
-.assistant pre {
-  background: #1a1a2e;
-  color: #d4d4d4;
-  padding: 12px;
-  overflow-x: auto;
-  margin: 8px 0;
-  font-size: var(--text-sm);
-}
-.assistant pre code {
-  background: none;
-  padding: 0;
-  color: inherit;
-}
-.assistant a {
-  color: var(--primary);
-  text-decoration: underline;
-}
-.assistant blockquote {
-  border-left: 2px solid var(--text-tertiary);
-  padding-left: 10px;
-  margin: 8px 0;
-  color: var(--text-secondary);
+.userText {
+  white-space: pre-wrap;
+  word-break: break-word;
 }

@@ -6,6 +6,12 @@
   overflow: hidden;
 }
 
+.messagesShell {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
 .infoBar {
   display: flex;
   align-items: center;
@@ -28,6 +34,7 @@
 
 .messages {
   flex: 1;
+  height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 40px 80px;
@@ -44,8 +51,6 @@
   border-left: 2px solid var(--primary);
   font-size: var(--text-base);
   line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-word;
 }
 
 .emotionTag {
@@ -60,14 +65,51 @@
   line-height: 1.2;
 }
 
-.streamingText {
-  display: inline;
-  white-space: pre-wrap;
+.streamingBody {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.streamingMarkdown {
+  width: 100%;
+}
+
+.thinkingDots {
+  color: var(--text-secondary);
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  animation: thinking-pulse 1.1s ease-in-out infinite;
 }
 
 .cursor {
   display: inline-block;
+  line-height: 1;
   animation: cursor-blink 1s infinite;
+}
+
+.scrollToBottomBtn {
+  position: absolute;
+  right: 28px;
+  bottom: 24px;
+  z-index: 10;
+  border: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--surface) 92%, white 8%);
+  color: var(--text);
+  padding: 10px 14px;
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(12px);
+  cursor: pointer;
+  transition: background var(--transition-normal), transform var(--transition-normal);
+}
+
+.scrollToBottomBtn:hover {
+  background: var(--surface-tint);
+  transform: translateY(-1px);
 }
 
 .empty {
@@ -77,4 +119,27 @@
   justify-content: center;
   color: var(--text-tertiary);
   font-size: var(--text-md);
+}
+
+@keyframes cursor-blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+
+  51%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes thinking-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+
+  50% {
+    opacity: 1;
+  }
 }

@@ -3,14 +3,15 @@ import { TitleBar } from "../components/TitleBar";
 import { SessionList } from "../components/SessionList";
 import { ChatView } from "../components/ChatView";
 import { SettingsModal } from "../components/SettingsModal";
+import styles from "./MainWindow.module.css";
 
 export function MainWindow() {
   const [showSettings, setShowSettings] = useState(false);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+    <div className={styles.window}>
       <TitleBar onOpenSettings={() => setShowSettings(true)} />
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+      <div className={styles.content}>
         <SessionList />
         <ChatView />
       </div>
