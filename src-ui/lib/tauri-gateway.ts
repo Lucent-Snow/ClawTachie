@@ -18,6 +18,10 @@ export interface GatewayErrorEvent {
   message: string;
 }
 
+export interface GatewayRunEndEvent {
+  sessionKey?: string;
+}
+
 export interface GatewaySessionPatch {
   label?: string | null;
   thinkingLevel?: string | null;
@@ -167,7 +171,7 @@ export async function getUpdaterProxy(): Promise<string | null> {
 
 export async function subscribeGatewayEvents(listeners: {
   onChatEvent: (payload: Record<string, unknown>) => void;
-  onRunEnd: () => void;
+  onRunEnd: (payload: GatewayRunEndEvent) => void;
   onDisconnected: (payload: GatewayDisconnectedEvent) => void;
   onError: (payload: GatewayErrorEvent) => void;
   onReconnecting?: () => void;
@@ -181,8 +185,8 @@ export async function subscribeGatewayEvents(listeners: {
     listen<Record<string, unknown>>("gateway://chat", (event) => {
       listeners.onChatEvent(event.payload);
     }),
-    listen("gateway://run-end", () => {
-      listeners.onRunEnd();
+    listen<GatewayRunEndEvent>("gateway://run-end", (event) => {
+      listeners.onRunEnd(event.payload);
     }),
     listen<GatewayDisconnectedEvent>("gateway://disconnected", (event) => {
       listeners.onDisconnected(event.payload);

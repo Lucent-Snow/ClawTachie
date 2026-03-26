@@ -26,6 +26,7 @@ use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, Web
 use uuid::Uuid;
 
 const CLIENT_ID: &str = "gateway-client";
+const CLIENT_DISPLAY_NAME: &str = "ClawTachie";
 const CLIENT_MODE: &str = "backend";
 const CLIENT_VERSION: &str = "0.1.0";
 const PROTOCOL_VERSION: u32 = 3;
@@ -494,6 +495,7 @@ async fn perform_handshake(
         "maxProtocol": PROTOCOL_VERSION,
         "client": {
           "id": CLIENT_ID,
+          "displayName": CLIENT_DISPLAY_NAME,
           "version": CLIENT_VERSION,
           "platform": platform,
           "mode": CLIENT_MODE

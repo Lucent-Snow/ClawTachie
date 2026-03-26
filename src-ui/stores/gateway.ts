@@ -113,19 +113,18 @@ function sessionNamespace(key: string | null | undefined): string {
 
 function buildNewSessionKey(sessions: SessionRow[], currentSessionKey: string | null, defaultSessionKey: string): string {
   const namespace = sessionNamespace(currentSessionKey || defaultSessionKey);
-  const baseKey = `${namespace}:new-session`;
-  const existingKeys = new Set(sessions.map((session) => session.key));
+  const pattern = new RegExp(`^${namespace.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}:session-(\\d+)$`);
 
-  if (!existingKeys.has(baseKey)) {
-    return baseKey;
+  let maxIndex = 0;
+  for (const session of sessions) {
+    const match = session.key.match(pattern);
+    const value = match ? Number(match[1]) : 0;
+    if (Number.isFinite(value) && value > maxIndex) {
+      maxIndex = value;
+    }
   }
 
-  let index = 1;
-  while (existingKeys.has(`${baseKey}${index}`)) {
-    index += 1;
-  }
-
-  return `${baseKey}${index}`;
+  return `${namespace}:session-${maxIndex + 1}`;
 }
 
 function splitGatewayModelValue(model: string): { model: string; provider?: string } {
@@ -194,7 +193,7 @@ export const useGateway = create<GatewayState>()((set, get) => ({
         : [...state.openSessionKeys, key],
       composerFocusToken: state.composerFocusToken + 1,
     }));
-    useChat.getState().clearMessages();
+    useChat.getState().clearMessages(key);
     await get().refreshSessions();
     return key;
   },
@@ -202,7 +201,7 @@ export const useGateway = create<GatewayState>()((set, get) => ({
   resetSession: async (key) => {
     await retryGatewayRequest(() => gatewaySessionsReset(key));
     if (get().currentSessionKey === key) {
-      useChat.getState().clearMessages();
+      useChat.getState().clearMessages(key);
     }
     set((state) => ({
       sessions: state.sessions.map((session) =>
@@ -238,7 +237,7 @@ export const useGateway = create<GatewayState>()((set, get) => ({
       openSessionKeys: prev.openSessionKeys.filter((sessionKey) => sessionKey !== key),
     });
     if (prev.currentSessionKey === key) {
-      useChat.getState().clearMessages();
+      useChat.getState().clearMessages(key);
     }
 
     await get().refreshSessions();
@@ -257,7 +256,6 @@ export const useGateway = create<GatewayState>()((set, get) => ({
           ? {
               ...session,
               label: normalized || undefined,
-              displayName: normalized || undefined,
               updatedAt: Date.now(),
             }
           : session,

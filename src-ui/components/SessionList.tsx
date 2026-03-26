@@ -2,28 +2,14 @@ import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { useChat } from "../stores/chat";
 import { useGateway } from "../stores/gateway";
 import { useSettings } from "../stores/settings";
+import { useWorkspace } from "../stores/workspace";
+import {
+  buildDisambiguatedSessionTitles,
+  getSessionSourceTitle,
+} from "../lib/session-display";
 import { broadcastSessionChange } from "../lib/window-sync";
 import type { SessionRow } from "../lib/types";
 import styles from "./SessionList.module.css";
-
-/** Extract agent name from session key like "agent:clawtachie:main" → "clawtachie" */
-function agentName(key: string): string {
-  const parts = key.split(":");
-  const [first = key, second = key] = parts;
-  // "agent:<name>:<session>" or "<name>:<session>" or just "<key>"
-  if (parts.length >= 3 && first === "agent") return second;
-  if (parts.length >= 2) return first;
-  return key;
-}
-
-function sessionLabel(s: SessionRow): string {
-  return s.displayName || s.label || s.key.split(":").pop() || s.key;
-}
-
-interface AgentGroup {
-  agent: string;
-  sessions: SessionRow[];
-}
 
 interface SessionMenuState {
   key: string;
@@ -31,52 +17,37 @@ interface SessionMenuState {
   y: number;
 }
 
-export function SessionList() {
-  const clearMessages = useChat((s) => s.clearMessages);
-  const sessions = useGateway((s) => s.sessions);
-  const currentKey = useGateway((s) => s.currentSessionKey);
-  const status = useGateway((s) => s.status);
-  const switchSession = useGateway((s) => s.switchSession);
-  const createSession = useGateway((s) => s.createSession);
-  const resetSession = useGateway((s) => s.resetSession);
-  const deleteSession = useGateway((s) => s.deleteSession);
-  const renameSession = useGateway((s) => s.renameSession);
-  const defaultSessionKey = useSettings((s) => s.gateway.sessionKey);
+export function SessionList({ onOpenWorkspaceManager }: { onOpenWorkspaceManager: () => void }) {
+  const clearMessages = useChat((state) => state.clearMessages);
+  const sessions = useGateway((state) => state.sessions);
+  const currentKey = useGateway((state) => state.currentSessionKey);
+  const status = useGateway((state) => state.status);
+  const switchSession = useGateway((state) => state.switchSession);
+  const resetSession = useGateway((state) => state.resetSession);
+  const deleteSession = useGateway((state) => state.deleteSession);
+  const renameSession = useGateway((state) => state.renameSession);
+  const defaultSessionKey = useSettings((state) => state.gateway.sessionKey);
+  const workspaceSessionKeys = useWorkspace((state) => state.sessionKeys);
+  const workspaceInitialized = useWorkspace((state) => state.initialized);
+  const initializeWorkspace = useWorkspace((state) => state.initialize);
+  const addToWorkspace = useWorkspace((state) => state.addSession);
+  const removeFromWorkspace = useWorkspace((state) => state.removeSession);
+  const pruneWorkspace = useWorkspace((state) => state.pruneSessions);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [draftLabel, setDraftLabel] = useState("");
   const [menu, setMenu] = useState<SessionMenuState | null>(null);
   const connected = status === "connected" || status === "reconnecting";
 
-  const groups = useMemo(() => {
-    const map = new Map<string, SessionRow[]>();
-    for (const s of sessions) {
-      const agent = agentName(s.key);
-      const list = map.get(agent) ?? [];
-      list.push(s);
-      map.set(agent, list);
-    }
-
-    const result: AgentGroup[] = [];
-    const defaultAgent = agentName(defaultSessionKey);
-
-    // Default agent group first
-    if (map.has(defaultAgent)) {
-      const list = map.get(defaultAgent)!;
-      // Within group, default session first
-      list.sort((a, b) =>
-        a.key === defaultSessionKey ? -1 : b.key === defaultSessionKey ? 1 : 0,
-      );
-      result.push({ agent: defaultAgent, sessions: list });
-      map.delete(defaultAgent);
-    }
-
-    // Remaining groups
-    for (const [agent, list] of map) {
-      result.push({ agent, sessions: list });
-    }
-
-    return result;
-  }, [sessions, defaultSessionKey]);
+  const workspaceSessions = useMemo(() => {
+    const byKey = new Map(sessions.map((session) => [session.key, session]));
+    return workspaceSessionKeys
+      .map((key) => byKey.get(key))
+      .filter((session): session is SessionRow => Boolean(session));
+  }, [sessions, workspaceSessionKeys]);
+  const sessionTitles = useMemo(
+    () => buildDisambiguatedSessionTitles(workspaceSessions),
+    [workspaceSessions],
+  );
 
   useEffect(() => {
     if (!menu) {
@@ -104,24 +75,36 @@ export function SessionList() {
     };
   }, [menu]);
 
-  const handleClick = (key: string) => {
-    if (key === currentKey) return;
-    switchSession(key);
-    void broadcastSessionChange(key);
-  };
+  useEffect(() => {
+    pruneWorkspace(sessions.map((session) => session.key));
+  }, [pruneWorkspace, sessions]);
 
-  const handleCreate = async () => {
-    if (!connected) return;
-    const key = await createSession();
-    setEditingKey(key);
-    setDraftLabel("");
+  useEffect(() => {
+    if (workspaceInitialized || sessions.length === 0) {
+      return;
+    }
+
+    const preferredKey =
+      sessions.find((session) => session.key === currentKey)?.key ??
+      sessions.find((session) => session.key === defaultSessionKey)?.key ??
+      sessions[0]?.key;
+
+    initializeWorkspace(preferredKey ? [preferredKey] : []);
+  }, [currentKey, defaultSessionKey, initializeWorkspace, sessions, workspaceInitialized]);
+
+  const handleClick = (key: string) => {
+    if (key === currentKey) {
+      return;
+    }
+
+    switchSession(key);
     void broadcastSessionChange(key);
   };
 
   const beginRename = (session: SessionRow) => {
     setMenu(null);
     setEditingKey(session.key);
-    setDraftLabel(session.displayName || session.label || "");
+    setDraftLabel(session.label || "");
   };
 
   const cancelRename = () => {
@@ -130,7 +113,10 @@ export function SessionList() {
   };
 
   const commitRename = async () => {
-    if (!editingKey) return;
+    if (!editingKey) {
+      return;
+    }
+
     const key = editingKey;
     const normalized = draftLabel.trim();
     cancelRename();
@@ -141,7 +127,7 @@ export function SessionList() {
     setMenu(null);
     await resetSession(key);
     if (key === currentKey) {
-      clearMessages();
+      clearMessages(key);
     }
   };
 
@@ -150,12 +136,32 @@ export function SessionList() {
     if (!window.confirm("删除这个会话？这会移除当前 session 记录。")) {
       return;
     }
+
+    const remainingWorkspaceKeys = workspaceSessionKeys.filter((sessionKey) => sessionKey !== key);
     const nextKey = await deleteSession(key);
+    removeFromWorkspace(key);
+
     if (key === currentKey) {
-      clearMessages();
-      if (nextKey) {
+      clearMessages(key);
+      if (remainingWorkspaceKeys[0]) {
+        switchSession(remainingWorkspaceKeys[0]);
+        void broadcastSessionChange(remainingWorkspaceKeys[0]);
+      } else if (nextKey) {
+        addToWorkspace(nextKey);
+        switchSession(nextKey);
         void broadcastSessionChange(nextKey);
       }
+    }
+  };
+
+  const handleRemoveFromWorkspace = (key: string) => {
+    setMenu(null);
+    const remainingWorkspaceKeys = workspaceSessionKeys.filter((sessionKey) => sessionKey !== key);
+    removeFromWorkspace(key);
+
+    if (key === currentKey && remainingWorkspaceKeys[0]) {
+      switchSession(remainingWorkspaceKeys[0]);
+      void broadcastSessionChange(remainingWorkspaceKeys[0]);
     }
   };
 
@@ -164,7 +170,7 @@ export function SessionList() {
     event.stopPropagation();
 
     const menuWidth = 180;
-    const menuHeight = 132;
+    const menuHeight = 168;
     const padding = 12;
     const x = Math.min(event.clientX, window.innerWidth - menuWidth - padding);
     const y = Math.min(event.clientY, window.innerHeight - menuHeight - padding);
@@ -176,26 +182,27 @@ export function SessionList() {
     });
   };
 
-  const menuSession = menu ? sessions.find((session) => session.key === menu.key) ?? null : null;
+  const menuSession = menu
+    ? workspaceSessions.find((session) => session.key === menu.key) ?? null
+    : null;
 
-  if (sessions.length === 0) {
+  if (workspaceSessions.length === 0) {
     return (
       <div className={styles.sidebar}>
         <div className={styles.sidebarHeader}>
           <div>
-            <div className={styles.headerEn}>SESSIONS</div>
-            <div className={styles.headerJa}>会话列表</div>
+            <div className={styles.headerEn}>WORKSPACE</div>
+            <div className={styles.headerJa}>工作区会话</div>
           </div>
           <button
             className={styles.createBtn}
-            onClick={() => void handleCreate()}
-            title="新建会话"
-            disabled={!connected}
+            onClick={onOpenWorkspaceManager}
+            title="添加会话"
           >
             +
           </button>
         </div>
-        <div className={styles.empty}>暂无会话</div>
+        <div className={styles.empty}>工作区里还没有会话，点击右上角添加。</div>
       </div>
     );
   }
@@ -204,64 +211,58 @@ export function SessionList() {
     <div className={styles.sidebar}>
       <div className={styles.sidebarHeader}>
         <div>
-          <div className={styles.headerEn}>SESSIONS</div>
-          <div className={styles.headerJa}>会话列表</div>
+          <div className={styles.headerEn}>WORKSPACE</div>
+          <div className={styles.headerJa}>工作区会话</div>
         </div>
         <button
           className={styles.createBtn}
-          onClick={() => void handleCreate()}
-          title="新建会话"
-          disabled={!connected}
+          onClick={onOpenWorkspaceManager}
+          title="添加会话"
         >
           +
         </button>
       </div>
-      {groups.map((g) => (
-        <div key={g.agent} className={styles.group}>
-          <div className={styles.groupHeader}>{g.agent}</div>
-          {g.sessions.map((s) => (
-            <div
-              key={s.key}
-              className={`${styles.itemRow} ${s.key === currentKey ? styles.active : ""} ${s.key === defaultSessionKey ? styles.default : ""}`}
-              title={s.key}
-              onContextMenu={(event) => openMenu(event, s)}
-            >
-              {editingKey === s.key ? (
-                <div className={styles.renameRow}>
-                  <input
-                    className={styles.renameInput}
-                    value={draftLabel}
-                    onChange={(event) => setDraftLabel(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        void commitRename();
-                      }
-                      if (event.key === "Escape") {
-                        event.preventDefault();
-                        cancelRename();
-                      }
-                    }}
-                    placeholder="输入会话名"
-                    autoFocus
-                  />
-                  <button className={styles.actionBtn} onClick={() => void commitRename()}>
-                    保存
-                  </button>
-                  <button className={styles.actionBtn} onClick={cancelRename}>
-                    取消
-                  </button>
-                </div>
-              ) : (
-                <button
-                  className={styles.item}
-                  onClick={() => handleClick(s.key)}
-                >
-                  <span className={styles.itemLabel}>{sessionLabel(s)}</span>
-                </button>
-              )}
+      {workspaceSessions.map((session) => (
+        <div
+          key={session.key}
+          className={`${styles.itemRow} ${session.key === currentKey ? styles.active : ""} ${session.key === defaultSessionKey ? styles.default : ""}`}
+          title={session.key}
+          onContextMenu={(event) => openMenu(event, session)}
+        >
+          {editingKey === session.key ? (
+            <div className={styles.renameRow}>
+              <input
+                className={styles.renameInput}
+                value={draftLabel}
+                onChange={(event) => setDraftLabel(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void commitRename();
+                  }
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    cancelRename();
+                  }
+                }}
+                placeholder="输入会话名"
+                autoFocus
+              />
+              <button className={styles.actionBtn} onClick={() => void commitRename()}>
+                保存
+              </button>
+              <button className={styles.actionBtn} onClick={cancelRename}>
+                取消
+              </button>
             </div>
-          ))}
+          ) : (
+            <button className={styles.item} onClick={() => handleClick(session.key)}>
+              <span className={styles.itemLabel}>{sessionTitles.get(session.key) ?? session.key}</span>
+              {getSessionSourceTitle(session) && (
+                <span className={styles.itemMeta}>{getSessionSourceTitle(session)}</span>
+              )}
+            </button>
+          )}
         </div>
       ))}
       {menu && menuSession ? (
@@ -270,11 +271,11 @@ export function SessionList() {
           style={{ left: menu.x, top: menu.y }}
           onClick={(event) => event.stopPropagation()}
         >
-          <button
-            className={styles.menuItem}
-            onClick={() => beginRename(menuSession)}
-          >
+          <button className={styles.menuItem} onClick={() => beginRename(menuSession)}>
             改名
+          </button>
+          <button className={styles.menuItem} onClick={() => handleRemoveFromWorkspace(menuSession.key)}>
+            移出工作区
           </button>
           <button
             className={styles.menuItem}

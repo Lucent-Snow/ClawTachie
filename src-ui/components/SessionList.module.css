@@ -52,11 +52,6 @@
   background: var(--primary-faint);
 }
 
-.createBtn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
 .itemRow {
   position: relative;
   display: flex;
@@ -86,7 +81,16 @@
   text-overflow: ellipsis;
 }
 
-/* Diamond bullet */
+.itemMeta {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .item::before {
   content: "";
   position: absolute;
@@ -122,43 +126,14 @@
   opacity: 1;
 }
 
-.itemDate {
-  display: block;
-  font-family: var(--font-label);
-  font-size: 10px;
-  color: var(--text-tertiary);
-  letter-spacing: 0.5px;
-  margin-top: 4px;
+.itemRow.default .item {
+  font-weight: 600;
 }
 
 .empty {
   padding: 20px;
   color: var(--text-tertiary);
   font-size: var(--text-xs);
-}
-
-/* Agent group */
-.group {
-  display: flex;
-  flex-direction: column;
-}
-
-.groupHeader {
-  padding: 10px 20px 4px;
-  font-family: var(--font-label);
-  font-size: 10px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--text-tertiary);
-}
-
-.itemRow.default .item {
-  font-weight: 600;
-}
-
-.renameRow {
-  opacity: 1;
-  pointer-events: auto;
 }
 
 .actionBtn {
@@ -179,10 +154,6 @@
 .actionBtn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-}
-
-.dangerBtn:hover:not(:disabled) {
-  color: var(--danger, #b94a48);
 }
 
 .contextMenu {

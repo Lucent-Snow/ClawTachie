@@ -1,12 +1,9 @@
 import { useMemo } from "react";
 import type { SessionRow } from "../lib/types";
 import { broadcastSessionChange } from "../lib/window-sync";
+import { buildDisambiguatedSessionTitles } from "../lib/session-display";
 import { useGateway } from "../stores/gateway";
 import styles from "./SessionTabs.module.css";
-
-function sessionTabLabel(session: SessionRow): string {
-  return session.displayName || session.label || session.key.split(":").pop() || session.key;
-}
 
 export function SessionTabs() {
   const sessions = useGateway((state) => state.sessions);
@@ -35,6 +32,10 @@ export function SessionTabs() {
         .filter((session): session is SessionRow => Boolean(session)),
     [openSessionKeys, sessions],
   );
+  const sessionTitles = useMemo(
+    () => buildDisambiguatedSessionTitles(openSessions),
+    [openSessions],
+  );
 
   if (openSessions.length === 0) {
     return (
@@ -60,7 +61,7 @@ export function SessionTabs() {
               title={session.key}
               aria-current={active ? "page" : undefined}
             >
-              <span className={styles.tabLabel}>{sessionTabLabel(session)}</span>
+              <span className={styles.tabLabel}>{sessionTitles.get(session.key) ?? session.key}</span>
               {session.model && (
                 <span className={styles.tabMeta}>{session.model}</span>
               )}
@@ -69,7 +70,7 @@ export function SessionTabs() {
               type="button"
               className={styles.closeButton}
               onClick={() => handleClose(session.key)}
-              aria-label={`关闭 ${sessionTabLabel(session)}`}
+              aria-label={`关闭 ${sessionTitles.get(session.key) ?? session.key}`}
               title="关闭标签页"
             >
               &#10005;

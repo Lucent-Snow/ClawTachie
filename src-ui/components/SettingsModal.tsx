@@ -4,6 +4,7 @@ import {
   gatewayConfigPatch,
   gatewayConfigSchema,
 } from "../lib/tauri-gateway";
+import { getSessionDisplayTitle } from "../lib/session-display";
 import { broadcastSessionChange, broadcastSettingsChange } from "../lib/window-sync";
 import { useGateway } from "../stores/gateway";
 import { useSettings } from "../stores/settings";
@@ -410,7 +411,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                   >
                     {sessions.map((s) => (
                       <option key={s.key} value={s.key}>
-                        {s.displayName || s.key}
+                        {getSessionDisplayTitle(s)}
                         {s.model ? ` (${s.model})` : ""}
                       </option>
                     ))}

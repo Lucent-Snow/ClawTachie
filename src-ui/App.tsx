@@ -17,9 +17,10 @@ export function App() {
   const { setStatus, switchSession, refreshSessions, status, connect } = useGateway();
   const {
     appendExternalUserMessage,
+    activateSession,
+    hasSessionState,
     handleChatEvent,
     finalizeStream,
-    clearMessages,
     loadHistory,
   } = useChat();
   const currentSessionKey = useGateway((s) => s.currentSessionKey);
@@ -43,11 +44,10 @@ export function App() {
 
     void subscribeGatewayEvents({
       onChatEvent: (payload) => {
-        const key = useGateway.getState().currentSessionKey;
-        if (key) handleChatEvent(payload, key);
+        handleChatEvent(payload);
       },
-      onRunEnd: () => {
-        finalizeStream();
+      onRunEnd: (payload) => {
+        finalizeStream(payload.sessionKey ?? useGateway.getState().currentSessionKey);
       },
       onDisconnected: () => {
         setStatus("disconnected");
@@ -91,7 +91,7 @@ export function App() {
           return;
         }
 
-        useChat.getState().appendExternalUserMessage(message);
+        useChat.getState().appendExternalUserMessage(sessionKey, message);
       },
       onSettingsChange: ({ settings: nextSettings }) => {
         useSettings.getState().applySnapshot(nextSettings);
@@ -124,10 +124,12 @@ export function App() {
   // Load history when session changes
   useEffect(() => {
     if (currentSessionKey && status === "connected") {
-      clearMessages();
-      loadHistory(currentSessionKey);
+      activateSession(currentSessionKey);
+      if (!hasSessionState(currentSessionKey)) {
+        void loadHistory(currentSessionKey);
+      }
     }
-  }, [currentSessionKey, status, clearMessages, loadHistory]);
+  }, [activateSession, currentSessionKey, hasSessionState, loadHistory, status]);
 
   useEffect(() => {
     document.body.dataset.window = isPetWindow ? "pet" : "main";
